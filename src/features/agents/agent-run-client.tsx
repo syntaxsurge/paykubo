@@ -1197,7 +1197,6 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
         ? AlertTriangle
         : Clock
   const outputItems = collectActionOutputs(action)
-  const latestPoll = getLatestAsyncPoll(action)
 
   return (
     <div className='border-border bg-background/55 rounded-lg border p-4 shadow-sm'>
@@ -1218,7 +1217,6 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
           </span>
         </div>
       </div>
-      {latestPoll ? <LatestPollStrip poll={latestPoll} /> : null}
       {action.errorMessage ? (
         <p className='mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm leading-6 text-red-600 dark:text-red-300'>
           {action.errorMessage}
@@ -1237,7 +1235,7 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
       {outputItems.length > 0 ? (
         <div className='mt-4'>
           <SectionLabel icon={Link2} label='Tool output' />
-          <OutputGallery outputs={outputItems} className='mt-3' compact />
+          <OutputGallery outputs={outputItems} className='mt-2' compact />
         </div>
       ) : null}
       {action.asyncPollingResponses?.length ? (
@@ -1349,26 +1347,6 @@ function ActionLinks({ action }: { action: AgentRun['actions'][number] }) {
   )
 }
 
-function LatestPollStrip({ poll }: { poll: AgentAsyncPoll }) {
-  return (
-    <div className='border-border/70 bg-muted/20 mt-3 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs'>
-      <span className='text-primary inline-flex items-center gap-1 font-semibold'>
-        <Activity className='h-3.5 w-3.5' aria-hidden />
-        Poll {poll.attempt}
-      </span>
-      <span className='text-foreground/60'>
-        {poll.orderStatus ?? 'status pending'}
-      </span>
-      {poll.resultReleaseStatus ? (
-        <span className='text-foreground/50'>{poll.resultReleaseStatus}</span>
-      ) : null}
-      <span className='text-foreground/45 ml-auto'>
-        {new Date(poll.polledAt).toLocaleTimeString()}
-      </span>
-    </div>
-  )
-}
-
 function AsyncPollingPanel({
   action
 }: {
@@ -1384,15 +1362,40 @@ function AsyncPollingPanel({
   const displayUrl = formatDisplayUrl(pollingUrl)
 
   return (
-    <div className='border-border/80 bg-card/45 mt-4 overflow-hidden rounded-lg border'>
-      <div className='border-border/70 flex flex-wrap items-center justify-between gap-3 border-b p-3'>
-        <SectionLabel icon={Activity} label='Async polling' />
-        <span className='bg-muted rounded-md px-2 py-1 text-xs font-semibold'>
-          Latest response
+    <details className='border-border/80 bg-card/45 mt-4 overflow-hidden rounded-lg border'>
+      <summary className='flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 p-3 [&::-webkit-details-marker]:hidden'>
+        <span className='flex min-w-0 flex-wrap items-center gap-2'>
+          <Activity className='text-primary h-4 w-4' aria-hidden />
+          <span className='text-foreground/60 text-xs font-semibold tracking-[0.14em] uppercase'>
+            Async polling
+          </span>
+          <span className='bg-primary/10 text-primary rounded-md px-2 py-1 text-xs font-semibold'>
+            HTTP {poll.httpStatus}
+          </span>
+          {poll.orderStatus ? (
+            <span className='bg-muted rounded-md px-2 py-1 text-xs font-semibold'>
+              {poll.orderStatus}
+            </span>
+          ) : null}
+          {poll.resultReleaseStatus ? (
+            <span className='text-foreground/55 text-xs'>
+              {poll.resultReleaseStatus}
+            </span>
+          ) : null}
         </span>
-      </div>
-      <div className='space-y-3 p-3'>
-        <PollingRow poll={poll} />
+        <span className='text-foreground/50 text-xs'>
+          {new Date(poll.polledAt).toLocaleTimeString()}
+        </span>
+      </summary>
+      <div className='border-border/70 grid gap-3 border-t p-3 md:grid-cols-2'>
+        <div className='border-border/70 bg-background/45 rounded-lg border p-3 text-sm'>
+          <p className='text-foreground/55 text-xs tracking-[0.14em] uppercase'>
+            Provider job
+          </p>
+          <p className='mt-1 truncate font-semibold'>
+            {poll.externalJobId ?? 'No provider job id yet'}
+          </p>
+        </div>
         <div className='border-border/70 bg-background/45 grid gap-3 rounded-lg border p-3 text-sm md:grid-cols-[minmax(0,1fr)_auto] md:items-center'>
           <div className='min-w-0'>
             <p className='text-foreground/55 text-xs tracking-[0.14em] uppercase'>
@@ -1434,7 +1437,7 @@ function AsyncPollingPanel({
           />
         </div>
       </details>
-    </div>
+    </details>
   )
 }
 
@@ -1443,51 +1446,6 @@ function getLatestAsyncPoll(
 ): AgentAsyncPoll | undefined {
   return (
     action.latestAsyncPollingResponse ?? action.asyncPollingResponses?.at(-1)
-  )
-}
-
-function PollingRow({ poll }: { poll: AgentAsyncPoll }) {
-  return (
-    <div className='border-border/70 bg-background/45 grid gap-2 rounded-lg border p-3 text-sm md:grid-cols-[96px_minmax(0,1fr)_auto] md:items-center'>
-      <div className='font-semibold'>Poll {poll.attempt}</div>
-      <div className='min-w-0'>
-        <div className='flex flex-wrap items-center gap-2'>
-          <span className='bg-primary/10 text-primary rounded-md px-2 py-1 text-xs font-semibold'>
-            HTTP {poll.httpStatus}
-          </span>
-          {poll.orderStatus ? (
-            <span className='bg-muted rounded-md px-2 py-1 text-xs font-semibold'>
-              {poll.orderStatus}
-            </span>
-          ) : null}
-          {poll.resultReleaseStatus ? (
-            <span className='text-foreground/60 text-xs'>
-              {poll.resultReleaseStatus}
-            </span>
-          ) : null}
-        </div>
-        <p className='text-foreground/50 mt-1 truncate text-xs'>
-          {poll.externalJobId ?? 'No provider job id yet'}
-        </p>
-      </div>
-      <div className='flex items-center gap-2 md:justify-end'>
-        <span className='text-foreground/50 text-xs'>
-          {new Date(poll.polledAt).toLocaleTimeString()}
-        </span>
-        {poll.resultUrl ? (
-          <a
-            href={poll.resultUrl}
-            target='_blank'
-            rel='noreferrer'
-            className='border-border bg-card/70 text-primary inline-flex h-8 w-8 items-center justify-center rounded-lg border'
-            title='Open result'
-            aria-label='Open result'
-          >
-            <ExternalLink className='h-4 w-4' aria-hidden />
-          </a>
-        ) : null}
-      </div>
-    </div>
   )
 }
 
@@ -1611,6 +1569,14 @@ function OutputPreview({
   output: AgentOutputItem
   compact?: boolean
 }) {
+  if (compact && output.kind === 'link') {
+    return (
+      <div className='border-border bg-background/50 rounded-lg border p-3'>
+        <CompactLinkPreview href={output.value} label={output.label} />
+      </div>
+    )
+  }
+
   return (
     <div className='border-border bg-background/50 overflow-hidden rounded-lg border'>
       <div className='border-border/80 flex flex-wrap items-start justify-between gap-2 border-b p-3'>
@@ -1672,7 +1638,7 @@ function OutputPreview({
   )
 }
 
-function CompactLinkPreview({ href }: { href: string }) {
+function CompactLinkPreview({ href, label }: { href: string; label?: string }) {
   const url = formatDisplayUrl(href)
 
   return (
@@ -1686,7 +1652,9 @@ function CompactLinkPreview({ href }: { href: string }) {
         <ExternalLink className='h-4 w-4' aria-hidden />
       </span>
       <span className='min-w-0'>
-        <span className='block truncate font-semibold'>{url.host}</span>
+        <span className='block truncate font-semibold'>
+          {label ? `${label} - ${url.host}` : url.host}
+        </span>
         <span className='text-foreground/55 group-hover:text-primary block truncate text-xs'>
           {url.path}
         </span>
