@@ -8,9 +8,6 @@ const userPlan = v.union(
   v.literal('plus')
 )
 
-const seededAdminWallet = '0x7ce33579392aeaf1791c9b0c8302a502b5867688'
-const seededAdminUsername = 'paykubo'
-
 export const getByWallet = query({
   args: {
     walletAddress: v.string()
@@ -26,21 +23,6 @@ export const getByWallet = query({
 
     if (profile) {
       return profile
-    }
-
-    if (walletAddress === seededAdminWallet) {
-      const now = Date.now()
-
-      return {
-        walletAddress,
-        fullName: 'Paykubo Labs',
-        username: seededAdminUsername,
-        normalizedUsername: seededAdminUsername,
-        email: 'hello@paykubo.com',
-        plan: 'plus',
-        createdAt: now,
-        updatedAt: now
-      }
     }
 
     return null
@@ -86,13 +68,6 @@ export const upsertProfile = mutation({
 
     validateUsername(normalizedUsername)
     validateEmail(args.email)
-
-    if (
-      normalizedUsername === seededAdminUsername &&
-      walletAddress !== seededAdminWallet
-    ) {
-      throw new Error('That username is already taken.')
-    }
 
     const existingUsername = await ctx.db
       .query('users')

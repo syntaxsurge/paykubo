@@ -5,6 +5,14 @@ import type {
 } from '@/features/provider-adapters/types'
 
 const PUBLIC_DATA_TIMEOUT_MS = 15_000
+export const publicDataProductSlugs = new Set([
+  'public-wikipedia-context',
+  'public-hn-trend-scan',
+  'public-github-repo-search',
+  'public-npm-package-signal',
+  'public-openalex-research-scan',
+  'public-gdelt-news-scan'
+])
 
 type FetchJsonResult =
   | { ok: true; status: number; data: unknown }

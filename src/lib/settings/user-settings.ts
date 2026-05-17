@@ -19,18 +19,12 @@ type LegacyUserSettings = Partial<UserSettings> & {
   website?: unknown
 }
 
-const adminProviderWallet = '0x7CE33579392AEAF1791c9B0c8302a502B5867688'
 const userSettingsCache = new Map<string, UserSettings>()
 
 const publicProfilesByWallet: Record<
   string,
   Omit<PublicUserProfile, 'walletAddress' | 'avatarInitials'>
-> = {
-  [adminProviderWallet.toLowerCase()]: {
-    fullName: 'Paykubo Labs',
-    username: 'paykubo'
-  }
-}
+> = {}
 
 export const defaultUserSettings: UserSettings = {
   fullName: '',

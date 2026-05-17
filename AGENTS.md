@@ -427,7 +427,7 @@ Before creating a new helper or service file:
   removes it from provider management and marketplace discovery.
 - `POST /api/providers/self/products/bulk-delete` — deletes selected
   provider-created API products owned by the connected wallet from the Convex
-  provider catalog; default admin-owned products are ignored by the product
+  provider catalog; seeded admin-owned products are ignored by the product
   store.
 - `POST /api/orders` — validates a buyer API request payload and returns a
   payment-required order record with a stable provider idempotency key for the
@@ -583,15 +583,15 @@ Before creating a new helper or service file:
   provider profile plan through `src/features/marketplace/provider-fees.ts`,
   default to Free when no saved plan exists, and store the provider plan,
   platform fee bps, provider share bps, platform fee amount, and provider amount
-  on successful receipts. Paykubo Labs public data wrappers for Wikipedia
+  on successful receipts. Seeded Paykubo Labs public data wrappers for Wikipedia
   search, Hacker News trend search, GitHub repository search, npm package
   search, OpenAlex research search, and GDELT news search use no upstream
   account or API key, stay x402-protected as paid Paykubo marketplace products,
-  are owned by the allowlisted admin provider wallet, and are agent-ready for
-  no-key public-data runs. Marketplace and product pages show the creator
-  identity card with avatar, name, username, and wallet address for these
-  products and provider-created listings. These products execute through the
-  dedicated `src/features/provider-adapters/public-data/adapter.ts` adapter,
+  are upserted into Convex with the configured allowlisted admin wallet, and are
+  agent-ready for no-key public-data runs. Marketplace and product pages show
+  the creator identity card with avatar, name, username, and wallet address for
+  these products and provider-created listings. These products execute through
+  the dedicated `src/features/provider-adapters/public-data/adapter.ts` adapter,
   which normalizes provider-specific request parameters, applies bounded
   upstream timeouts, and uses no-key public fallback sources for providers that
   rate limit, reject narrow queries, or return temporary gateway errors.
