@@ -27,9 +27,13 @@ import type { AgentAction, AgentRun } from '@/features/agents/types'
 import { resolveProductPrice } from '@/features/marketplace/pricing'
 import { getProductBySlug } from '@/features/marketplace/products'
 import type { MarketplaceReceipt } from '@/features/marketplace/receipts'
+import type { MarketplaceOrder } from '@/features/marketplace/types'
 import { defaultAppChain, morphUsdcTokenAddress } from '@/lib/config/chains'
 import { envClient } from '@/lib/env/env.client'
 import { envServer } from '@/lib/env/env.server'
+
+const asyncProviderPollIntervalMs = 5_000
+const asyncProviderPollAttempts = 72
 
 export async function executeAgentRunActions(
   run: AgentRun,
@@ -169,13 +173,24 @@ async function executeAgentAction(
       appUrl
     )
 
+    const resultStatus =
+      paidResult.order?.status === 'failed' ||
+      paidResult.order?.status === 'expired' ||
+      paidResult.order?.status === 'delta_payment_required'
+        ? 'failed'
+        : 'completed'
+
     return {
       ...started,
-      status: 'completed',
+      status: resultStatus,
       responsePayload: paidResult.data,
       receipt: paidResult.receipt,
       orderId: paidResult.order?.id,
       requestId: paidResult.order?.requestId,
+      errorMessage:
+        resultStatus === 'failed'
+          ? describeAsyncOrderFailure(paidResult.order)
+          : undefined,
       completedAt: new Date().toISOString()
     } satisfies AgentAction
   } catch (caughtError) {
@@ -231,11 +246,240 @@ async function callPaidProductWithAgentWallet(
     throw new Error(describePaidCallFailure(response, body))
   }
 
-  return body as {
-    order?: { id?: string; requestId?: string }
-    receipt: MarketplaceReceipt
-    data: Record<string, unknown>
+  return await waitForPaidProductCompletion({
+    appUrl,
+    initial: body as PaidProductCallResponse
+  })
+}
+
+type PaidProductCallResponse = {
+  order?: Partial<MarketplaceOrder>
+  receipt: MarketplaceReceipt
+  data: Record<string, unknown>
+  pricing?: unknown
+  provider?: unknown
+  x402?: unknown
+  escrow?: unknown
+}
+
+type ProviderStatusResponse = {
+  error?: string
+  order?: MarketplaceOrder
+  provider?: {
+    status?: string
+    externalJobId?: string
+    resultUrl?: string
+    responsePayload?: unknown
+    errorMessage?: string
   }
+  pricing?: unknown
+  escrow?: unknown
+}
+
+async function waitForPaidProductCompletion({
+  appUrl,
+  initial
+}: {
+  appUrl: string
+  initial: PaidProductCallResponse
+}) {
+  const order = initial.order
+
+  if (!shouldPollPaidOrder(order)) {
+    return normalizePaidProductResponse(initial, order)
+  }
+
+  let lastOrder = order
+
+  for (let attempt = 1; attempt <= asyncProviderPollAttempts; attempt += 1) {
+    if (attempt > 1) {
+      await delay(asyncProviderPollIntervalMs)
+    }
+
+    const response = await fetch(
+      `${appUrl}/api/orders/${encodeURIComponent(String(order?.id))}/provider-status`,
+      {
+        headers: { Accept: 'application/json' }
+      }
+    )
+    const body = (await readJsonResponse(response)) as ProviderStatusResponse
+
+    if (!response.ok || !body.order) {
+      throw new Error(
+        body.error ??
+          `Unable to poll async provider status (${response.status} ${response.statusText}).`
+      )
+    }
+
+    lastOrder = body.order
+    const next = normalizePaidProductResponse(
+      {
+        ...initial,
+        order: body.order,
+        data: buildProviderStatusData(body)
+      },
+      body.order
+    )
+
+    if (!shouldPollPaidOrder(body.order)) {
+      return next
+    }
+  }
+
+  throw new Error(
+    [
+      `Async provider job ${lastOrder?.externalJobId ?? ''} did not finish before the agent polling window expired.`,
+      'Open the order page to continue polling, or retry the agent after the provider job completes.'
+    ]
+      .filter(Boolean)
+      .join(' ')
+  )
+}
+
+function normalizePaidProductResponse(
+  response: PaidProductCallResponse,
+  order: PaidProductCallResponse['order']
+): PaidProductCallResponse {
+  return {
+    ...response,
+    order,
+    data: {
+      ...response.data,
+      order,
+      resultUrl:
+        order?.resultUrl ??
+        extractResultUrl(response.data) ??
+        response.data?.resultUrl,
+      externalJobId: order?.externalJobId ?? response.data?.externalJobId,
+      status: order?.status ?? response.data?.status,
+      resultReleaseStatus:
+        order?.resultReleaseStatus ?? response.data?.resultReleaseStatus
+    }
+  }
+}
+
+function buildProviderStatusData(body: ProviderStatusResponse) {
+  const order = body.order
+  const responsePayload =
+    order?.responsePayload ?? body.provider?.responsePayload
+  const resultUrl =
+    order?.resultUrl ??
+    body.provider?.resultUrl ??
+    extractResultUrl(responsePayload)
+
+  return {
+    status: order?.status ?? body.provider?.status,
+    resultReleaseStatus: order?.resultReleaseStatus,
+    externalJobId: order?.externalJobId ?? body.provider?.externalJobId,
+    resultUrl,
+    responsePayload,
+    provider: body.provider,
+    pricing: body.pricing,
+    escrow: body.escrow,
+    order
+  } as Record<string, unknown>
+}
+
+function shouldPollPaidOrder(order: PaidProductCallResponse['order']) {
+  if (!order?.id) {
+    return false
+  }
+
+  if (
+    order.status === 'completed' ||
+    order.status === 'failed' ||
+    order.status === 'expired' ||
+    order.status === 'delta_payment_required'
+  ) {
+    return false
+  }
+
+  return Boolean(
+    order.externalJobId ||
+      order.resultReleaseStatus === 'provider_retrying' ||
+      order.resultReleaseStatus === 'reserved'
+  )
+}
+
+function extractResultUrl(value: unknown): string | undefined {
+  const direct = getStringPath(value, [
+    'resultUrl',
+    'renderUrl',
+    'previewUrl',
+    'publicProjectUrl',
+    'projectUrl',
+    'cloneUrl',
+    'outputUrl',
+    'url'
+  ])
+
+  if (direct) {
+    return direct
+  }
+
+  return getStringPath(value, [
+    'result.resultUrl',
+    'result.renderUrl',
+    'result.previewUrl',
+    'result.publicProjectUrl',
+    'result.projectUrl',
+    'result.cloneUrl',
+    'result.outputUrl',
+    'data.resultUrl',
+    'data.renderUrl',
+    'data.previewUrl',
+    'data.publicProjectUrl',
+    'data.projectUrl',
+    'data.cloneUrl',
+    'data.outputUrl'
+  ])
+}
+
+function getStringPath(value: unknown, paths: string[]) {
+  for (const path of paths) {
+    const match = readPath(value, path)
+
+    if (typeof match === 'string' && match.trim().length > 0) {
+      return match
+    }
+  }
+
+  return undefined
+}
+
+function readPath(value: unknown, path: string): unknown {
+  return path.split('.').reduce<unknown>((current, key) => {
+    if (!current || typeof current !== 'object') {
+      return undefined
+    }
+
+    return (current as Record<string, unknown>)[key]
+  }, value)
+}
+
+function describeAsyncOrderFailure(order: PaidProductCallResponse['order']) {
+  if (!order) {
+    return 'The paid provider request failed.'
+  }
+
+  const providerError =
+    typeof order.responsePayload === 'object' &&
+    order.responsePayload &&
+    'errorMessage' in order.responsePayload &&
+    typeof order.responsePayload.errorMessage === 'string'
+      ? order.responsePayload.errorMessage
+      : undefined
+
+  return (
+    providerError ||
+    `The provider job ended with status ${order.status}. Result release state: ${
+      order.resultReleaseStatus ?? 'unknown'
+    }.`
+  )
+}
+
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 const agentPublicClient = createPublicClient({
@@ -456,9 +700,10 @@ function buildFallbackDeliverables(
   )
   const asyncAction = completedActions.find(
     action =>
-      Boolean(action.responsePayload?.resultUrl) ||
+      Boolean(extractResultUrl(action.responsePayload)) ||
       Boolean(action.responsePayload?.externalJobId)
   )
+  const videoResultUrl = extractResultUrl(asyncAction?.responsePayload)
 
   return {
     ...planMetadata,
@@ -470,7 +715,7 @@ function buildFallbackDeliverables(
       completedActions.length > 0
         ? `${completedActions.length} paid tool result(s) are attached to this run.`
         : undefined,
-    videoResultUrl: String(asyncAction?.responsePayload?.resultUrl ?? '')
+    videoResultUrl: videoResultUrl ?? ''
   }
 }
 
@@ -506,7 +751,7 @@ async function synthesizeWithOpenAi(
                 'You are Paykubo Launch Pack Agent synthesizer.',
                 'Use the completed paid tool outputs, receipts, skipped tools, and objective to produce the final launch-pack deliverables.',
                 'Do not invent receipts, transactions, or provider results.',
-                'If a media result URL exists, include it in videoResultUrl. Otherwise use an empty string.',
+                'Only include videoResultUrl when a completed media action returned a final result, project, render, preview, clone, or output URL. Do not use queued or processing job IDs as final media output.',
                 'Return only structured JSON that matches the schema.'
               ].join('\n')
             }

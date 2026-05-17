@@ -622,20 +622,23 @@ Before creating a new helper or service file:
   when the allowance is insufficient, waits until the allowance is readable, and
   then executes the hosted x402 call from the same origin that triggered the
   run. Paid action failures preserve the response body, settlement guidance, and
-  provider details in action diagnostics. Agent-paid x402 calls include the
-  agent run ID in gateway order and receipt records so provider dashboards and
-  usage pages count autonomous tool calls in the same revenue ledger as browser
-  and developer API calls. When `AGENT_LLM_API_KEY` is configured, the agent
-  uses the OpenAI Responses API with `AGENT_LLM_MODEL` or `gpt-5.2` to select
-  tools, generate request payloads, skip unrelated tools, set a budget strategy,
-  and synthesize the final launch pack from completed paid responses and
-  receipts. When no paid action completes in production, the run remains failed
-  and presents diagnostics instead of treating generated copy as verified
-  output. When the key is absent, the deterministic fallback ranks the allowed
-  marketplace tools from the objective and source context. Both planner modes
-  record the prompt, model or fallback label, rationale, skipped tools, selected
-  tools, funding ledger, and synthesis metadata in run deliverables, action
-  cards, and proof payloads.
+  provider details in action diagnostics. Async provider actions use the same
+  `/api/orders/[orderId]/provider-status` polling path as marketplace orders;
+  queued and processing media jobs remain incomplete until the provider returns
+  a terminal result, refund state, or completed project URL. Agent-paid x402
+  calls include the agent run ID in gateway order and receipt records so
+  provider dashboards and usage pages count autonomous tool calls in the same
+  revenue ledger as browser and developer API calls. When `AGENT_LLM_API_KEY` is
+  configured, the agent uses the OpenAI Responses API with `AGENT_LLM_MODEL` or
+  `gpt-5.2` to select tools, generate request payloads, skip unrelated tools,
+  set a budget strategy, and synthesize the final launch pack from completed
+  paid responses and receipts. When no paid action completes in production, the
+  run remains failed and presents diagnostics instead of treating generated copy
+  as verified output. When the key is absent, the deterministic fallback ranks
+  the allowed marketplace tools from the objective and source context. Both
+  planner modes record the prompt, model or fallback label, rationale, skipped
+  tools, selected tools, funding ledger, and synthesis metadata in run
+  deliverables, action cards, and proof payloads.
 - `/agents` is a tabbed command center that opens on recent runs and also
   exposes a templates tab. Both tabs use separate server-fed tables with search,
   sorting, and pagination; recent runs support current-page row selection and
@@ -655,8 +658,8 @@ Before creating a new helper or service file:
   mode/model, selected and skipped tools, planner rationale, budget ledger,
   receipt links, per-tool request and response JSON, extracted tool output
   previews, Markdown-rendered deliverables, a final output section that renders
-  detected text, image, video, and result-link deliverables, unused refund
-  controls, and writes Morph proof attestations.
+  detected text, image, video, and result-link deliverables at the bottom of the
+  run page, unused refund controls, and writes Morph proof attestations.
 - `/proofs/[proofId]` publicly displays non-sensitive autonomous run proof
   metadata, proof hash, receipt IDs, budget funding and refund metadata, total
   USDC spend, attestation transaction, and Morph explorer link.

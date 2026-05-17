@@ -330,7 +330,6 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
             run={run}
             completedPaidActions={completedPaidActions}
           />
-          <FinalOutputSection outputs={finalOutputs} run={run} />
         </div>
 
         <RunControlPanel
@@ -353,6 +352,8 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
       <ExecutionSection run={run} />
 
       <AdvancedRunDetails run={run} />
+
+      <FinalOutputSection outputs={finalOutputs} run={run} />
     </div>
   )
 }
@@ -941,12 +942,12 @@ function FinalOutputSection({
       <div className='flex flex-wrap items-start justify-between gap-3'>
         <div>
           <p className='text-foreground/60 text-xs tracking-[0.16em] uppercase'>
-            Final output
+            Final deliverable
           </p>
-          <h3 className='mt-1 text-lg font-semibold'>Agent deliverables</h3>
+          <h3 className='mt-1 text-lg font-semibold'>Final agent output</h3>
           <p className='text-foreground/65 mt-1 max-w-2xl text-sm leading-6'>
-            Rendered media, result links, and final text extracted from the
-            agent's completed tool responses and synthesis.
+            Completed project links, rendered media, and final text extracted
+            after async tools finish and the agent synthesis is ready.
           </p>
         </div>
         <span className='bg-muted rounded-md px-2 py-1 text-xs font-semibold'>
@@ -958,9 +959,9 @@ function FinalOutputSection({
         <OutputGallery outputs={outputs} />
       ) : (
         <p className='border-border text-foreground/65 rounded-lg border border-dashed p-4 text-sm leading-6'>
-          Final outputs appear here after a paid tool returns text, image,
-          video, or result URLs. Use the tool response panels above to inspect
-          failed or pending calls.
+          Final deliverables appear here after paid tools return completed text,
+          image, video, or project URLs. Use the tool response panels above to
+          inspect failed or pending calls.
         </p>
       )}
     </Card>
