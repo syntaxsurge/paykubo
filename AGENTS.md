@@ -617,10 +617,13 @@ Before creating a new helper or service file:
   video-first launch campaigns that combine public data scans with async
   media-generation tools when budget allows. Agent runs require the owner to
   fund the `AgentRunVault` with USDC before the configured agent signer can
-  execute x402 paid actions. Funding confirmation and execution both verify the
-  run against the current deployed vault's `budgetOf` state, so stale local
-  funding records from an old vault reset to an unfunded state instead of
-  attempting `recordSpend`. Before each paid action, Paykubo advances the quoted
+  execute x402 paid actions. The run detail client funds through the browser
+  EIP-1193 wallet provider, requests the MetaMask account when needed, switches
+  or adds Morph Hoodi, submits the USDC approval, then submits `fundRun`.
+  Funding confirmation and execution both verify the run against the current
+  deployed vault's `budgetOf` state, so stale local funding records from an old
+  vault reset to an unfunded state instead of attempting `recordSpend`. Before
+  each paid action, Paykubo advances the quoted
   USDC amount from the vault to the agent signer with `recordSpend`, verifies
   the signer's balance, submits the required Permit2 approval when the allowance
   is insufficient, waits until the allowance is readable, and then executes the

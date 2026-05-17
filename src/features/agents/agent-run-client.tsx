@@ -21,13 +21,21 @@ import {
   Undo2,
   WalletCards
 } from 'lucide-react'
-import { createPublicClient, http, type Address, type Hex } from 'viem'
-import { useAccount, useWalletClient } from 'wagmi'
+import {
+  createPublicClient,
+  encodeFunctionData,
+  http,
+  isAddress,
+  numberToHex,
+  type Address,
+  type Hex
+} from 'viem'
 
 import { JsonViewer } from '@/components/data-display/json-viewer'
 import { MarkdownViewer } from '@/components/data-display/markdown-viewer'
 import { Button, buttonClasses } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { WalletAddressConsumer } from '@/components/wallet/wallet-address-consumer'
 import {
   agentActionStatusLabels,
   agentRunStatusDetails,
@@ -68,6 +76,12 @@ type AgentRunClientProps = {
   initialRun: AgentRun | null
 }
 
+type EthereumProvider = {
+  isMetaMask?: boolean
+  providers?: EthereumProvider[]
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>
+}
+
 type FundingPrepareResponse = {
   run: AgentRun
   funding: {
@@ -93,8 +107,24 @@ const agentRunPollingStatuses = new Set<AgentRun['status']>([
 ])
 
 export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
-  const { address } = useAccount()
-  const { data: walletClient } = useWalletClient()
+  return (
+    <WalletAddressConsumer>
+      {({ address }) => (
+        <AgentRunContent
+          runId={runId}
+          initialRun={initialRun}
+          address={address}
+        />
+      )}
+    </WalletAddressConsumer>
+  )
+}
+
+function AgentRunContent({
+  runId,
+  initialRun,
+  address
+}: AgentRunClientProps & { address: string | null }) {
   const [run, setRun] = useState<AgentRun | null>(initialRun)
   const [status, setStatus] = useState('')
   const [isFunding, setIsFunding] = useState(false)
@@ -179,15 +209,11 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
   }
 
   async function fundRun() {
-    if (!walletClient?.account) {
-      setStatus('Connect the wallet that owns this run before funding it.')
-      return
-    }
-
     setIsFunding(true)
     setStatus('Preparing the agent budget vault transaction.')
 
     try {
+      const fundingWallet = await requestFundingWalletAddress(address)
       const prepareResponse = await fetch(
         `/api/agents/runs/${runId}/funding/prepare`,
         { method: 'POST' }
@@ -199,28 +225,34 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
       }
 
       setRun(prepared.run)
-      setStatus('Approve USDC for the agent run vault in your wallet.')
-      const approvalTxHash = await walletClient.writeContract({
-        address: prepared.funding.tokenAddress,
-        abi: erc20ApprovalAbi,
-        functionName: 'approve',
-        args: [prepared.funding.vaultAddress, BigInt(prepared.funding.amount)]
+      setStatus('Open MetaMask and approve USDC for the agent run vault.')
+      const approvalTxHash = await sendBrowserWalletTransaction({
+        from: fundingWallet,
+        to: prepared.funding.tokenAddress,
+        data: encodeFunctionData({
+          abi: erc20ApprovalAbi,
+          functionName: 'approve',
+          args: [prepared.funding.vaultAddress, BigInt(prepared.funding.amount)]
+        })
       })
 
       await publicClient.waitForTransactionReceipt({ hash: approvalTxHash })
 
-      setStatus('Funding the agent run vault.')
-      const fundingTxHash = await walletClient.writeContract({
-        address: prepared.funding.vaultAddress,
-        abi: agentRunVaultAbi,
-        functionName: 'fundRun',
-        args: [
-          prepared.funding.runId,
-          prepared.funding.tokenAddress,
-          BigInt(prepared.funding.amount),
-          prepared.funding.agentSigner,
-          BigInt(prepared.funding.expiresAt)
-        ]
+      setStatus('Open MetaMask again to fund the agent run vault.')
+      const fundingTxHash = await sendBrowserWalletTransaction({
+        from: fundingWallet,
+        to: prepared.funding.vaultAddress,
+        data: encodeFunctionData({
+          abi: agentRunVaultAbi,
+          functionName: 'fundRun',
+          args: [
+            prepared.funding.runId,
+            prepared.funding.tokenAddress,
+            BigInt(prepared.funding.amount),
+            prepared.funding.agentSigner,
+            BigInt(prepared.funding.expiresAt)
+          ]
+        })
       })
 
       await publicClient.waitForTransactionReceipt({ hash: fundingTxHash })
@@ -426,6 +458,138 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
   )
 }
 
+async function requestFundingWalletAddress(expectedAddress: string | null) {
+  const provider = getBrowserEthereumProvider()
+
+  if (!provider) {
+    throw new Error(
+      'MetaMask was not detected. Open Paykubo in a browser with MetaMask installed, then click Fund agent again.'
+    )
+  }
+
+  const accounts = (await provider.request({
+    method: 'eth_requestAccounts'
+  })) as unknown
+  const selectedAddress = Array.isArray(accounts)
+    ? accounts.find(
+        (account): account is Address =>
+          typeof account === 'string' && isAddress(account)
+      )
+    : null
+
+  if (!selectedAddress) {
+    throw new Error('MetaMask did not return a funding wallet address.')
+  }
+
+  if (
+    expectedAddress &&
+    selectedAddress.toLowerCase() !== expectedAddress.toLowerCase()
+  ) {
+    throw new Error(
+      `MetaMask is using ${shorten(
+        selectedAddress
+      )}, but this Paykubo session is connected as ${shorten(
+        expectedAddress
+      )}. Switch MetaMask to the connected wallet, then fund again.`
+    )
+  }
+
+  return selectedAddress
+}
+
+async function sendBrowserWalletTransaction({
+  from,
+  to,
+  data
+}: {
+  from: Address
+  to: Address
+  data: Hex
+}) {
+  const provider = getBrowserEthereumProvider()
+
+  if (!provider) {
+    throw new Error('MetaMask was not detected.')
+  }
+
+  await ensureBrowserWalletChain(provider)
+  const txHash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [
+      {
+        from,
+        to,
+        data,
+        value: '0x0'
+      }
+    ]
+  })
+
+  if (typeof txHash !== 'string' || !txHash.startsWith('0x')) {
+    throw new Error('MetaMask did not return a transaction hash.')
+  }
+
+  return txHash as Hex
+}
+
+async function ensureBrowserWalletChain(provider: EthereumProvider) {
+  const chainId = numberToHex(defaultAppChain.id)
+
+  try {
+    await provider.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId }]
+    })
+    return
+  } catch (error) {
+    if (getWalletErrorCode(error) !== 4902) {
+      throw error
+    }
+  }
+
+  await provider.request({
+    method: 'wallet_addEthereumChain',
+    params: [
+      {
+        chainId,
+        chainName: defaultAppChain.name,
+        nativeCurrency: defaultAppChain.nativeCurrency,
+        rpcUrls: defaultAppChain.viemChain.rpcUrls.default.http,
+        blockExplorerUrls: [defaultAppChain.explorer.baseUrl]
+      }
+    ]
+  })
+
+  await provider.request({
+    method: 'wallet_switchEthereumChain',
+    params: [{ chainId }]
+  })
+}
+
+function getBrowserEthereumProvider() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const ethereum = (window as Window & { ethereum?: EthereumProvider }).ethereum
+
+  if (!ethereum) {
+    return null
+  }
+
+  return (
+    ethereum.providers?.find(
+      (provider: EthereumProvider) => provider.isMetaMask
+    ) ?? ethereum
+  )
+}
+
+function getWalletErrorCode(error: unknown) {
+  return typeof error === 'object' && error && 'code' in error
+    ? Number((error as { code?: unknown }).code)
+    : null
+}
+
 function RunSummaryCard({
   run,
   completedPaidActions
@@ -536,7 +700,7 @@ function RunControlPanel({
   onAttest
 }: {
   run: AgentRun
-  address?: string
+  address: string | null
   status: string
   isFunding: boolean
   isRunning: boolean
