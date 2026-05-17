@@ -7,6 +7,7 @@ import {
 import { executeAgentRunActions } from '@/features/agents/runner'
 import { getAgentTemplate } from '@/features/agents/templates'
 import type {
+  AgentAsyncPollingResponse,
   AgentLedgerEvent,
   AgentProof,
   AgentRun,
@@ -25,6 +26,10 @@ import {
   writeAgentRunVault
 } from '@/lib/contracts/agent-run-vault'
 import { getConvexClient } from '@/lib/db/convex/client'
+import {
+  compactJsonPayload,
+  compactProviderRequestTrace
+} from '@/lib/utils/json-payload'
 
 import { api } from '../../../convex/_generated/api'
 
@@ -82,6 +87,81 @@ export async function getAgentProof(proofId: string) {
   await loadAgentProofs()
 
   return proofs.get(proofId)
+}
+
+export async function syncAgentRunAsyncProviderStatus(
+  runId: string,
+  appUrl: string
+) {
+  const run = await getAgentRun(runId)
+
+  if (!run) {
+    return null
+  }
+
+  const syncableAction = run.actions.find(shouldSyncAsyncAction)
+
+  if (!syncableAction?.orderId) {
+    return run
+  }
+
+  const pollingUrl = `${appUrl}/api/orders/${encodeURIComponent(syncableAction.orderId)}/provider-status`
+  const pollingRequest = {
+    method: 'GET',
+    url: pollingUrl,
+    headers: { Accept: 'application/json' },
+    params: { orderId: syncableAction.orderId }
+  }
+  const response = await fetch(pollingUrl, {
+    headers: pollingRequest.headers
+  }).catch(() => null)
+
+  if (!response) {
+    return run
+  }
+
+  const body = (await response
+    .json()
+    .catch(() => null)) as ProviderStatusResponse | null
+
+  if (!body?.order) {
+    return run
+  }
+
+  const poll = buildStoredAsyncPollingResponse({
+    action: syncableAction,
+    pollingUrl,
+    request: pollingRequest,
+    httpStatus: response.status,
+    body
+  })
+  const actionStatus = mapProviderStatusToAgentActionStatus(
+    body.order.status,
+    syncableAction.status
+  )
+  const nextAction = {
+    ...syncableAction,
+    status: actionStatus,
+    responsePayload: buildStoredProviderStatusPayload(body),
+    latestAsyncPollingResponse: poll,
+    asyncPollingResponses: [poll],
+    completedAt:
+      actionStatus === 'completed' || actionStatus === 'failed'
+        ? new Date().toISOString()
+        : syncableAction.completedAt
+  } satisfies AgentRun['actions'][number]
+  const nextRun = {
+    ...run,
+    actions: run.actions.map(action =>
+      action.id === nextAction.id ? nextAction : action
+    ),
+    updatedAt: new Date().toISOString()
+  } satisfies AgentRun
+
+  runs.set(nextRun.id, nextRun)
+  await persistAgentRun(nextRun)
+
+  return nextRun
 }
 
 export async function createAgentRun(input: CreateAgentRunInput) {
@@ -706,7 +786,7 @@ async function loadAgentProofs() {
 async function persistAgentRun(run: AgentRun) {
   await getConvexClient().mutation(api.agentState.upsertRun, {
     runKey: run.id,
-    runJson: JSON.stringify(run)
+    runJson: JSON.stringify(createPersistableAgentRun(run))
   })
 }
 
@@ -759,4 +839,183 @@ function isAgentProof(value: unknown): value is AgentProof {
     typeof proof.proofHash === 'string' &&
     typeof proof.createdAt === 'string'
   )
+}
+
+type ProviderStatusResponse = {
+  error?: string
+  order?: {
+    id?: string
+    status?: string
+    externalJobId?: string
+    resultReleaseStatus?: string
+    resultUrl?: string
+    responsePayload?: unknown
+    providerRequest?: unknown
+  }
+  provider?: {
+    status?: string
+    externalJobId?: string
+    resultUrl?: string
+    responsePayload?: unknown
+    errorMessage?: string
+  }
+  pricing?: unknown
+  escrow?: unknown
+}
+
+function createPersistableAgentRun(run: AgentRun): AgentRun {
+  return {
+    ...run,
+    actions: run.actions.map(action => ({
+      ...action,
+      responsePayload: compactJsonPayload(
+        action.responsePayload,
+        0
+      ) as AgentRun['actions'][number]['responsePayload'],
+      latestAsyncPollingResponse: compactAsyncPollingResponse(
+        action.latestAsyncPollingResponse
+      ),
+      asyncPollingResponses: action.latestAsyncPollingResponse
+        ? [compactAsyncPollingResponse(action.latestAsyncPollingResponse)!]
+        : action.asyncPollingResponses?.slice(-1).flatMap(poll => {
+            const compactPoll = compactAsyncPollingResponse(poll)
+
+            return compactPoll ? [compactPoll] : []
+          })
+    }))
+  }
+}
+
+function compactAsyncPollingResponse(
+  poll: AgentAsyncPollingResponse | undefined
+): AgentAsyncPollingResponse | undefined {
+  if (!poll) {
+    return undefined
+  }
+
+  return {
+    ...poll,
+    response: compactJsonPayload(poll.response, 0) as Record<string, unknown>
+  }
+}
+
+function shouldSyncAsyncAction(action: AgentRun['actions'][number]) {
+  if (!action.orderId || action.status !== 'paid') {
+    return false
+  }
+
+  const latestPoll =
+    action.latestAsyncPollingResponse ?? action.asyncPollingResponses?.at(-1)
+
+  return !isTerminalProviderStatus(latestPoll?.orderStatus)
+}
+
+function buildStoredAsyncPollingResponse({
+  action,
+  pollingUrl,
+  request,
+  httpStatus,
+  body
+}: {
+  action: AgentRun['actions'][number]
+  pollingUrl: string
+  request: AgentAsyncPollingResponse['request']
+  httpStatus: number
+  body: ProviderStatusResponse
+}): AgentAsyncPollingResponse {
+  const priorAttempt =
+    action.latestAsyncPollingResponse?.attempt ??
+    action.asyncPollingResponses?.at(-1)?.attempt ??
+    0
+  const resultUrl = extractResultUrlFromProviderStatus(body)
+
+  return {
+    id: `poll_${Date.now().toString(36)}_${priorAttempt + 1}`,
+    attempt: priorAttempt + 1,
+    polledAt: new Date().toISOString(),
+    pollingUrl,
+    request,
+    httpStatus,
+    orderStatus: body.order?.status,
+    resultReleaseStatus: body.order?.resultReleaseStatus,
+    externalJobId: body.order?.externalJobId ?? body.provider?.externalJobId,
+    resultUrl,
+    response: buildStoredProviderStatusPayload(body)
+  }
+}
+
+function buildStoredProviderStatusPayload(
+  body: ProviderStatusResponse
+): Record<string, unknown> {
+  const resultUrl = extractResultUrlFromProviderStatus(body)
+
+  return {
+    status: body.order?.status ?? body.provider?.status,
+    resultReleaseStatus: body.order?.resultReleaseStatus,
+    externalJobId: body.order?.externalJobId ?? body.provider?.externalJobId,
+    resultUrl,
+    order: body.order
+      ? {
+          id: body.order.id,
+          status: body.order.status,
+          externalJobId: body.order.externalJobId,
+          resultReleaseStatus: body.order.resultReleaseStatus,
+          resultUrl: body.order.resultUrl,
+          providerRequest: compactProviderRequestTrace(
+            body.order.providerRequest
+          ),
+          responsePayload: compactJsonPayload(body.order.responsePayload, 0)
+        }
+      : undefined,
+    provider: compactJsonPayload(body.provider, 0),
+    pricing: compactJsonPayload(body.pricing),
+    escrow: compactJsonPayload(body.escrow),
+    error: body.error
+  }
+}
+
+function mapProviderStatusToAgentActionStatus(
+  status: string | undefined,
+  current: AgentRun['actions'][number]['status']
+) {
+  if (status === 'completed') {
+    return 'completed'
+  }
+
+  if (status === 'failed' || status === 'expired') {
+    return 'failed'
+  }
+
+  return current
+}
+
+function isTerminalProviderStatus(status: string | undefined) {
+  return status === 'completed' || status === 'failed' || status === 'expired'
+}
+
+function extractResultUrlFromProviderStatus(body: ProviderStatusResponse) {
+  return (
+    body.order?.resultUrl ??
+    body.provider?.resultUrl ??
+    readStringPath(body.order?.responsePayload, 'previewUrl') ??
+    readStringPath(body.provider?.responsePayload, 'previewUrl') ??
+    readStringPath(body.order?.responsePayload, 'renderUrl') ??
+    readStringPath(body.provider?.responsePayload, 'renderUrl') ??
+    readStringPath(body.order?.responsePayload, 'resultUrl') ??
+    readStringPath(body.provider?.responsePayload, 'resultUrl') ??
+    readStringPath(body.order?.responsePayload, 'result.previewUrl') ??
+    readStringPath(body.provider?.responsePayload, 'result.previewUrl')
+  )
+}
+
+function readStringPath(value: unknown, path: string) {
+  const result = path.split('.').reduce<unknown>((current, part) => {
+    if (!current || typeof current !== 'object') {
+      return undefined
+    }
+
+    return (current as Record<string, unknown>)[part]
+  }, value)
+
+  return typeof result === 'string' && result.trim() ? result : undefined
 }

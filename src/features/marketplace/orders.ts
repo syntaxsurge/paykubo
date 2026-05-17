@@ -1,5 +1,9 @@
 import type { MarketplaceOrder } from '@/features/marketplace/types'
 import { getConvexClient } from '@/lib/db/convex/client'
+import {
+  compactJsonPayload,
+  compactProviderRequestTrace
+} from '@/lib/utils/json-payload'
 
 import { api } from '../../../convex/_generated/api'
 
@@ -23,9 +27,10 @@ export async function getMarketplaceOrderById(orderId: string) {
 }
 
 export async function recordMarketplaceOrder(order: MarketplaceOrder) {
+  const persistableOrder = createPersistableMarketplaceOrder(order)
   const saved = await getConvexClient().mutation(api.orders.upsertSnapshot, {
     orderKey: order.id,
-    orderJson: JSON.stringify(order)
+    orderJson: JSON.stringify(persistableOrder)
   })
 
   return normalizeMarketplaceOrder(saved) ?? order
@@ -94,4 +99,17 @@ function normalizeMarketplaceOrder(value: unknown): MarketplaceOrder | null {
   }
 
   return null
+}
+
+function createPersistableMarketplaceOrder(
+  order: MarketplaceOrder
+): MarketplaceOrder {
+  return {
+    ...order,
+    responsePayload: compactJsonPayload(order.responsePayload, 0),
+    lockedResponsePayload: compactJsonPayload(order.lockedResponsePayload, 0),
+    providerRequest: compactProviderRequestTrace(
+      order.providerRequest
+    ) as MarketplaceOrder['providerRequest']
+  }
 }

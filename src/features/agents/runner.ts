@@ -51,6 +51,10 @@ import {
 } from '@/lib/contracts/agent-run-vault'
 import { envClient } from '@/lib/env/env.client'
 import { envServer } from '@/lib/env/env.server'
+import {
+  compactJsonPayload,
+  compactProviderRequestTrace
+} from '@/lib/utils/json-payload'
 
 const asyncProviderPollIntervalMs = 5_000
 const asyncProviderPollAttempts = 72
@@ -103,6 +107,13 @@ export async function executeAgentRunActions(
   )
 
   for (const action of actions) {
+    if (action.status === 'completed') {
+      completedActions.push(action)
+      spendUsd = addActionSpend(spendUsd, action)
+      await publishActionProgress(action)
+      continue
+    }
+
     if (shouldStop()) {
       const stoppedAction = {
         ...action,
@@ -123,15 +134,7 @@ export async function executeAgentRunActions(
       publishActionProgress
     )
 
-    if (result.vaultAdvancedAmountUsdc && !result.vaultRefundedAmountUsdc) {
-      spendUsd = Number(
-        (spendUsd + parseUsdcLabel(result.vaultAdvancedAmountUsdc)).toFixed(6)
-      )
-    } else if (result.receipt) {
-      spendUsd = Number(
-        (spendUsd + parseUsdcLabel(result.receipt.amountUsdc)).toFixed(6)
-      )
-    }
+    spendUsd = addActionSpend(spendUsd, result)
 
     completedActions.push(result)
     await publishActionProgress(result)
@@ -170,6 +173,10 @@ async function executeAgentAction(
   appUrl?: string,
   onProgress?: AgentActionProgressHandler
 ) {
+  if (action.status === 'paid' && action.orderId && action.receipt && appUrl) {
+    return await completeExistingPaidAction(action, appUrl, onProgress)
+  }
+
   const product = await getProductBySlug(action.productSlug)
 
   if (!product) {
@@ -393,6 +400,24 @@ function parseUsdcLabel(value: string) {
   return Number.isFinite(amount) ? amount : 0
 }
 
+function addActionSpend(currentSpendUsd: number, action: AgentAction) {
+  if (action.vaultAdvancedAmountUsdc && !action.vaultRefundedAmountUsdc) {
+    return Number(
+      (
+        currentSpendUsd + parseUsdcLabel(action.vaultAdvancedAmountUsdc)
+      ).toFixed(6)
+    )
+  }
+
+  if (action.receipt) {
+    return Number(
+      (currentSpendUsd + parseUsdcLabel(action.receipt.amountUsdc)).toFixed(6)
+    )
+  }
+
+  return currentSpendUsd
+}
+
 async function advanceAgentVaultSpend({
   runId,
   action,
@@ -558,6 +583,68 @@ type ProviderStatusResponse = {
   escrow?: unknown
 }
 
+async function completeExistingPaidAction(
+  action: AgentAction,
+  appUrl: string,
+  onProgress?: AgentActionProgressHandler
+) {
+  let paidProgress = action
+  const latestPoll =
+    action.latestAsyncPollingResponse ?? action.asyncPollingResponses?.at(-1)
+  const paidResult = await waitForPaidProductCompletion({
+    appUrl,
+    initial: {
+      order: {
+        id: action.orderId,
+        status: latestPoll?.orderStatus ?? 'processing',
+        externalJobId: latestPoll?.externalJobId,
+        resultReleaseStatus: latestPoll?.resultReleaseStatus,
+        resultUrl: latestPoll?.resultUrl
+      } as PaidProductCallResponse['order'],
+      receipt: action.receipt!,
+      data: action.responsePayload ?? {},
+      provider: action.responsePayload?.provider,
+      pricing: action.responsePayload?.pricing,
+      escrow: action.responsePayload?.escrow
+    },
+    onProgress: async (progress, pollingResponse) => {
+      paidProgress = {
+        ...paidProgress,
+        responsePayload: buildPaidProductResponsePayload(progress),
+        latestAsyncPollingResponse:
+          pollingResponse ?? paidProgress.latestAsyncPollingResponse,
+        asyncPollingResponses: pollingResponse
+          ? [pollingResponse]
+          : paidProgress.asyncPollingResponses,
+        receipt: progress.receipt,
+        orderId: progress.order?.id ?? paidProgress.orderId,
+        requestId: progress.order?.requestId ?? paidProgress.requestId
+      } satisfies AgentAction
+      await onProgress?.(paidProgress)
+    }
+  })
+  const resultStatus =
+    paidResult.order?.status === 'failed' ||
+    paidResult.order?.status === 'expired' ||
+    paidResult.order?.status === 'delta_payment_required'
+      ? 'failed'
+      : 'completed'
+
+  return {
+    ...paidProgress,
+    status: resultStatus,
+    responsePayload: buildPaidProductResponsePayload(paidResult),
+    receipt: paidResult.receipt,
+    orderId: paidResult.order?.id ?? paidProgress.orderId,
+    requestId: paidResult.order?.requestId ?? paidProgress.requestId,
+    errorMessage:
+      resultStatus === 'failed'
+        ? describeAsyncOrderFailure(paidResult.order)
+        : undefined,
+    completedAt: new Date().toISOString()
+  } satisfies AgentAction
+}
+
 async function waitForPaidProductCompletion({
   appUrl,
   initial,
@@ -673,19 +760,19 @@ function buildAsyncPollingResponse({
     resultReleaseStatus: body.order?.resultReleaseStatus,
     externalJobId: body.order?.externalJobId ?? body.provider?.externalJobId,
     resultUrl,
-    response: body as Record<string, unknown>
+    response: compactProviderStatusResponse(body)
   }
 }
 
 function buildPaidProductResponsePayload(result: PaidProductCallResponse) {
   const payload: Record<string, unknown> = {
-    data: result.data,
-    order: result.order,
+    data: compactJsonPayload(result.data, 0),
+    order: compactMarketplaceOrderForAgent(result.order),
     receipt: result.receipt,
-    pricing: result.pricing,
-    provider: result.provider,
+    pricing: compactJsonPayload(result.pricing),
+    provider: compactJsonPayload(result.provider, 0),
     x402: result.x402,
-    escrow: result.escrow
+    escrow: compactJsonPayload(result.escrow)
   }
   const resultUrl =
     extractResultUrl(result.data) ??
@@ -699,6 +786,33 @@ function buildPaidProductResponsePayload(result: PaidProductCallResponse) {
   return Object.fromEntries(
     Object.entries(payload).filter(([, value]) => value !== undefined)
   )
+}
+
+function compactProviderStatusResponse(
+  body: ProviderStatusResponse
+): Record<string, unknown> {
+  return {
+    order: compactMarketplaceOrderForAgent(body.order),
+    provider: compactJsonPayload(body.provider, 0),
+    pricing: compactJsonPayload(body.pricing),
+    escrow: compactJsonPayload(body.escrow),
+    error: body.error
+  }
+}
+
+function compactMarketplaceOrderForAgent(
+  order: PaidProductCallResponse['order']
+) {
+  if (!order) {
+    return undefined
+  }
+
+  return {
+    ...order,
+    responsePayload: compactJsonPayload(order.responsePayload, 0),
+    lockedResponsePayload: compactJsonPayload(order.lockedResponsePayload, 0),
+    providerRequest: compactProviderRequestTrace(order.providerRequest)
+  }
 }
 
 function normalizePaidProductResponse(

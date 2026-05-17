@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 
-import { deleteAgentRun, getAgentRun } from '@/features/agents/store'
+import {
+  deleteAgentRun,
+  syncAgentRunAsyncProviderStatus
+} from '@/features/agents/store'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,8 +13,11 @@ type AgentRunRouteProps = {
   }>
 }
 
-export async function GET(_request: Request, { params }: AgentRunRouteProps) {
-  const run = await getAgentRun((await params).runId)
+export async function GET(request: Request, { params }: AgentRunRouteProps) {
+  const run = await syncAgentRunAsyncProviderStatus(
+    (await params).runId,
+    new URL(request.url).origin
+  )
 
   if (!run) {
     return NextResponse.json(

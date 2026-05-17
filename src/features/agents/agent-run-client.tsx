@@ -166,7 +166,8 @@ function AgentRunContent({
     Boolean(run) &&
     (isRunning ||
       isAttesting ||
-      agentRunPollingStatuses.has(run?.status ?? 'planned'))
+      agentRunPollingStatuses.has(run?.status ?? 'planned') ||
+      Boolean(run?.actions.some(shouldPollAsyncActionOnClient)))
 
   useAutoPolling({
     enabled: shouldPollRun,
@@ -1190,10 +1191,11 @@ function LedgerTimeline({ events }: { events: AgentLedgerEvent[] }) {
 }
 
 function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
+  const displayStatus = getActionDisplayStatus(action)
   const Icon =
-    action.status === 'completed'
+    displayStatus.tone === 'completed'
       ? CheckCircle2
-      : action.status === 'failed'
+      : displayStatus.tone === 'failed'
         ? AlertTriangle
         : Clock
   const outputItems = collectActionOutputs(action)
@@ -1213,7 +1215,7 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
         <div className='flex flex-wrap items-center justify-end gap-2'>
           <ActionLinks action={action} />
           <span className='bg-muted rounded-md px-2 py-1 text-xs font-semibold'>
-            {agentActionStatusLabels[action.status]}
+            {displayStatus.label}
           </span>
         </div>
       </div>
@@ -1275,6 +1277,52 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
       </details>
     </div>
   )
+}
+
+function getActionDisplayStatus(action: AgentRun['actions'][number]) {
+  const poll = getLatestAsyncPoll(action)
+
+  if (action.status === 'paid' && poll?.orderStatus) {
+    if (poll.orderStatus === 'completed') {
+      return { label: 'Completed', tone: 'completed' as const }
+    }
+
+    if (poll.orderStatus === 'failed' || poll.orderStatus === 'expired') {
+      return { label: humanizePath(poll.orderStatus), tone: 'failed' as const }
+    }
+
+    if (poll.orderStatus === 'processing') {
+      return { label: 'Processing', tone: 'running' as const }
+    }
+
+    if (poll.orderStatus === 'forwarding') {
+      return { label: 'Running', tone: 'running' as const }
+    }
+
+    if (poll.orderStatus === 'created' || poll.orderStatus === 'paid') {
+      return { label: 'Pending', tone: 'running' as const }
+    }
+  }
+
+  return {
+    label: agentActionStatusLabels[action.status],
+    tone:
+      action.status === 'completed'
+        ? ('completed' as const)
+        : action.status === 'failed'
+          ? ('failed' as const)
+          : ('running' as const)
+  }
+}
+
+function shouldPollAsyncActionOnClient(action: AgentRun['actions'][number]) {
+  if (action.status !== 'paid' || !action.orderId) {
+    return false
+  }
+
+  const poll = getLatestAsyncPoll(action)
+
+  return !['completed', 'failed', 'expired'].includes(poll?.orderStatus ?? '')
 }
 
 function ActionLinks({ action }: { action: AgentRun['actions'][number] }) {
@@ -1734,12 +1782,21 @@ function collectFinalOutputs(run: AgentRun) {
 }
 
 function collectActionOutputs(action: AgentRun['actions'][number]) {
-  if (!action.responsePayload) {
-    return []
-  }
-
   const outputs: AgentOutputItem[] = []
   const seen = new Set<string>()
+  const latestPoll = getLatestAsyncPoll(action)
+
+  addOutput(outputs, seen, {
+    id: `${action.id}-async-result`,
+    label: 'Provider result',
+    source: action.productName,
+    value: latestPoll?.resultUrl,
+    kind: classifyUrl(latestPoll?.resultUrl, 'resultUrl')
+  })
+
+  if (!action.responsePayload) {
+    return outputs
+  }
 
   for (const candidate of extractResponseOutputs(action.responsePayload)) {
     if (!shouldSurfaceOutputCandidate(candidate.path, candidate.value)) {
