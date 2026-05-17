@@ -648,13 +648,19 @@ Before creating a new helper or service file:
   provider dashboards and usage pages count autonomous tool calls in the same
   revenue ledger as browser and developer API calls. Morph Hoodi x402 payment
   requirements use the settlement token's EIP-712 domain metadata in
-  `NEXT_PUBLIC_USDC_TOKEN_NAME` and `NEXT_PUBLIC_USDC_TOKEN_VERSION`; the public
-  UI still labels the settlement asset as USDC, but signed x402 payloads must
-  match the deployed Hoodi token domain for facilitator verification and
-  settlement. When `AGENT_LLM_API_KEY` is configured, the agent uses the OpenAI
-  Responses API with `AGENT_LLM_MODEL` or `gpt-5.2` to select tools, generate
-  request payloads, skip unrelated tools, reserve one affordable media tool when
-  the objective or template requires video output, set a budget strategy, and
+  `NEXT_PUBLIC_USDC_TOKEN_NAME` and `NEXT_PUBLIC_USDC_TOKEN_VERSION`; the known
+  Morph Hoodi settlement token is normalized to its deployed `HoodiTestToken`
+  EIP-712 domain if the env is absent or still set to the display label `USDC`.
+  The public UI still labels the settlement asset as USDC, but signed x402
+  payloads must match the deployed Hoodi token domain for facilitator
+  verification and settlement. Vault spend and refund writes wait for successful
+  transaction receipts, and refund recovery reads the vault's live spent amount
+  before calling `recordSpendRefund` so retries and partially recovered failures
+  do not request a larger refund than the current vault state can accept. When
+  `AGENT_LLM_API_KEY` is configured, the agent uses the OpenAI Responses API
+  with `AGENT_LLM_MODEL` or `gpt-5.2` to select tools, generate request
+  payloads, skip unrelated tools, reserve one affordable media tool when the
+  objective or template requires video output, set a budget strategy, and
   synthesize the final launch pack from completed paid responses and receipts.
   When no paid action completes in production, the run remains failed and
   presents diagnostics instead of treating generated copy as verified output.

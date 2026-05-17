@@ -38,6 +38,7 @@ import type { MarketplaceOrder } from '@/features/marketplace/types'
 import { defaultAppChain, morphUsdcTokenAddress } from '@/lib/config/chains'
 import {
   getAgentRunBytes32,
+  getAgentRunVaultBudget,
   getAgentRunVaultAddress,
   getAgentVaultPaymentId,
   parseUsdcToAtomic,
@@ -417,13 +418,26 @@ async function refundAgentVaultAdvance({
     throw new Error('The vault payment ID is missing for this agent action.')
   }
 
-  const returnTx = await returnAgentSignerUsdcToVault(amountUsd)
+  const requestedAmount = parseUsdcToAtomic(amountUsd)
+  const budget = await getAgentRunVaultBudget(runId).catch(() => null)
+  const refundableAmount =
+    budget && budget.spentAmount < requestedAmount
+      ? budget.spentAmount
+      : requestedAmount
+
+  if (refundableAmount <= 0n) {
+    return {
+      vaultRefundedAmountUsdc: '0.00 USDC'
+    } satisfies Partial<AgentAction>
+  }
+
+  const returnTx = await returnAgentSignerUsdcToVault(refundableAmount)
   const refund = await writeAgentRunVault({
     functionName: 'recordSpendRefund',
     args: [
       getAgentRunBytes32(runId),
       action.vaultPaymentId as Hex,
-      parseUsdcToAtomic(amountUsd)
+      refundableAmount
     ]
   })
 
@@ -434,7 +448,10 @@ async function refundAgentVaultAdvance({
   }
 
   return {
-    vaultRefundedAmountUsdc: amountLabel,
+    vaultRefundedAmountUsdc:
+      refundableAmount === requestedAmount
+        ? amountLabel
+        : formatUsdcAmount(refundableAmount),
     vaultRefundTxHash: refund.txHash,
     vaultRefundExplorerUrl: refund.explorerUrl,
     vaultReturnTxHash: returnTx.txHash,
@@ -734,7 +751,7 @@ const usdcAgentAbi = parseAbi([
   'function transfer(address to, uint256 amount) returns (bool)'
 ])
 
-async function returnAgentSignerUsdcToVault(amountUsd: number) {
+async function returnAgentSignerUsdcToVault(amount: bigint) {
   const privateKey = envServer.AGENT_SPENDER_PRIVATE_KEY
   const vaultAddress = getAgentRunVaultAddress()
 
@@ -759,7 +776,7 @@ async function returnAgentSignerUsdcToVault(amountUsd: number) {
       address: morphUsdcTokenAddress as Address,
       abi: usdcAgentAbi,
       functionName: 'transfer',
-      args: [vaultAddress, parseUsdcToAtomic(amountUsd)]
+      args: [vaultAddress, amount]
     })
     .catch(error => {
       throw new Error(

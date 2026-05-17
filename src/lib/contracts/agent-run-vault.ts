@@ -296,8 +296,11 @@ export async function writeAgentRunVault({
     account
   })
   const txHash = await walletClient.writeContract(request)
+  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
 
-  await publicClient.waitForTransactionReceipt({ hash: txHash })
+  if (receipt.status !== 'success') {
+    throw new Error(`AgentRunVault ${functionName} transaction reverted.`)
+  }
 
   return {
     txHash,
