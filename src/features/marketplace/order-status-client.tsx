@@ -53,6 +53,7 @@ import {
   paymentTokenAddress,
   paymentTokenDecimals,
   paymentTokenSymbol,
+  paymentTokenTransferMethod,
   x402Network
 } from '@/lib/config/chains'
 import { walletProvider } from '@/lib/config/wallet'
@@ -395,7 +396,9 @@ function OrderStatusContent({
       }
 
       setOrder(nextOrder)
-      setStatus('USDC payment settled and provider response returned.')
+      setStatus(
+        `${paymentTokenSymbol} payment settled and provider response returned.`
+      )
     } catch (caughtError) {
       setStatus(
         caughtError instanceof Error
@@ -488,9 +491,11 @@ function OrderStatusContent({
 
       updateWalletStep('signature', {
         status: 'active',
-        detail: 'Confirm the x402 USDC payment signature in your wallet.'
+        detail: `Confirm the x402 ${paymentTokenSymbol} payment signature in your wallet.`
       })
-      setStatus('Waiting for wallet signature and USDC settlement.')
+      setStatus(
+        `Waiting for wallet signature and ${paymentTokenSymbol} settlement.`
+      )
 
       const client = registerExactEvmScheme(new x402Client(), {
         signer: walletControls.signer
@@ -508,7 +513,7 @@ function OrderStatusContent({
           status: 'active',
           detail:
             attempt === 0
-              ? 'Confirm the x402 USDC payment signature in your wallet.'
+              ? `Confirm the x402 ${paymentTokenSymbol} payment signature in your wallet.`
               : `Retrying wallet signature and settlement ${attempt + 1} of ${TRANSIENT_RETRY_ATTEMPTS}.`
         })
 
@@ -544,7 +549,7 @@ function OrderStatusContent({
 
             permit2AllowanceRefreshUsed = true
             setStatus(
-              'USDC approval is confirmed, but the payment retry still needs a refreshed allowance check.'
+              `${paymentTokenSymbol} approval is confirmed, but the payment retry still needs a refreshed allowance check.`
             )
             await sleep(calculateRetryDelay(attempt))
             await ensurePermit2Allowance(
@@ -617,7 +622,7 @@ function OrderStatusContent({
         })
         throw new Error(
           body.error ??
-            'Wallet payment was not completed. Check USDC balance, network, and signature approval.'
+            `Wallet payment was not completed. Check ${paymentTokenSymbol} balance, network, and signature approval.`
         )
       }
 
@@ -641,8 +646,8 @@ function OrderStatusContent({
       updateWalletStep('settlement', {
         status: 'complete',
         detail: settlementTxHash
-          ? 'USDC settled on the configured network.'
-          : 'USDC settled and the gateway received the paid response.',
+          ? `${paymentTokenSymbol} settled on the configured network.`
+          : `${paymentTokenSymbol} settled and the gateway received the paid response.`,
         txHash: isHexTransactionHash(settlementTxHash)
           ? settlementTxHash
           : undefined
@@ -700,8 +705,8 @@ function OrderStatusContent({
               body.error ||
               'Payment settled, but the provider request failed.'
             : settlementTxHash
-              ? `USDC payment settled on-chain. Transaction: ${settlementTxHash}`
-              : 'USDC payment settled and provider response returned.'
+              ? `${paymentTokenSymbol} payment settled on-chain. Transaction: ${settlementTxHash}`
+              : `${paymentTokenSymbol} payment settled and provider response returned.`
       )
       setPaymentError(
         providerFailed
@@ -1041,7 +1046,7 @@ function OrderStatusContent({
             <div className='flex flex-col gap-3 sm:items-end'>
               <div className='flex flex-wrap gap-2 sm:justify-end'>
                 <Badge className='w-fit'>x402</Badge>
-                <Badge className='w-fit'>USDC</Badge>
+                <Badge className='w-fit'>{paymentTokenSymbol}</Badge>
                 <Badge className='w-fit'>Network</Badge>
               </div>
               <div className='flex flex-wrap gap-2 sm:justify-end'>
@@ -1137,7 +1142,7 @@ function createWalletSteps(activeStep?: WalletStepId): WalletStep[] {
     {
       id: 'allowance',
       title: 'Approve',
-      description: 'USDC ready'
+      description: `${paymentTokenSymbol} ready`
     },
     {
       id: 'signature',
@@ -1307,7 +1312,7 @@ function StatusMessage({
     return (
       <div className='text-foreground/60 mt-3 flex items-center gap-2 text-sm'>
         <ShieldCheck className='h-4 w-4' aria-hidden />
-        <span>First run may ask for USDC approval.</span>
+        <span>First run may ask for {paymentTokenSymbol} approval.</span>
       </div>
     )
   }
@@ -1458,8 +1463,8 @@ function ProviderResponsePanel({
             <p className='font-semibold'>Metered delta required</p>
             <p className='text-foreground/70 mt-1 text-sm leading-6'>
               Final usage is {order.actualAmountUsdc ?? 'above the quote'}. Pay
-              the remaining {order.deltaAmountUsdc ?? 'USDC'} to unlock the
-              completed provider response.
+              the remaining {order.deltaAmountUsdc ?? paymentTokenSymbol} to
+              unlock the completed provider response.
             </p>
           </div>
           <Button onClick={onClaim} disabled={isClaiming}>
@@ -1914,8 +1919,8 @@ function buildPaidRequestError(
     paymentRequired?.error === 'permit2_allowance_required'
   ) {
     return [
-      'USDC settlement still needs Permit2 allowance or sufficient wallet funds.',
-      `Approve the USDC allowance when prompted, then confirm the wallet has enough USDC and ${defaultAppChain.nativeCurrency.symbol} gas on ${defaultAppChain.shortName}.`
+      `${paymentTokenSymbol} settlement still needs Permit2 allowance or sufficient wallet funds.`,
+      `Approve the ${paymentTokenSymbol} allowance when prompted, then confirm the wallet has enough ${paymentTokenSymbol} and ${defaultAppChain.nativeCurrency.symbol} gas on ${defaultAppChain.shortName}.`
     ].join(' ')
   }
 
@@ -1933,7 +1938,7 @@ function buildPaidRequestError(
         paymentResult.settleResponse.errorReason
       ]
         .filter(Boolean)
-        .join(' ') || 'USDC settlement failed.'
+        .join(' ') || `${paymentTokenSymbol} settlement failed.`
     )
   }
 
@@ -2260,13 +2265,13 @@ async function ensurePermit2Allowance(
 ) {
   onStep('allowance', {
     status: 'active',
-    detail: `Checking ${paymentTokenSymbol} balance and Permit2 allowance.`
+    detail: `Checking ${paymentTokenSymbol} balance and payment readiness.`
   })
-  const requirement = getPermit2Requirement(paymentRequired)
+  const requirement = getConfiguredPaymentRequirement(paymentRequired)
 
   if (!requirement) {
     const mismatchedRequirement =
-      getMismatchedPermit2Requirement(paymentRequired)
+      getMismatchedPaymentRequirement(paymentRequired)
 
     if (mismatchedRequirement) {
       throw new Error(
@@ -2278,7 +2283,7 @@ async function ensurePermit2Allowance(
 
     onStep('allowance', {
       status: 'complete',
-      detail: 'This payment requirement does not need Permit2 approval.'
+      detail: `No ${paymentTokenSymbol} readiness check is needed for this payment requirement.`
     })
     return
   }
@@ -2302,8 +2307,10 @@ async function ensurePermit2Allowance(
   }
 
   onStatus(
-    `Checking ${paymentTokenSymbol} Permit2 allowance on ${defaultAppChain.shortName}.`
+    `Checking ${paymentTokenSymbol} balance on ${defaultAppChain.shortName}.`
   )
+
+  const usesPermit2 = isPermit2PaymentRequirement(requirement)
 
   const [balance, allowance, tokenDecimals] = await withTransientRetries(
     () =>
@@ -2314,12 +2321,14 @@ async function ensurePermit2Allowance(
           functionName: 'balanceOf',
           args: [walletControls.signer.address]
         }),
-        paymentChainPublicClient.readContract(
-          getPermit2AllowanceReadParams({
-            tokenAddress,
-            ownerAddress: walletControls.signer.address
-          })
-        ),
+        usesPermit2
+          ? paymentChainPublicClient.readContract(
+              getPermit2AllowanceReadParams({
+                tokenAddress,
+                ownerAddress: walletControls.signer.address
+              })
+            )
+          : Promise.resolve(requiredAmount),
         paymentChainPublicClient.readContract({
           address: tokenAddress,
           abi: usdcBalanceAbi,
@@ -2344,6 +2353,14 @@ async function ensurePermit2Allowance(
         tokenDecimals
       )} ${paymentTokenSymbol} on ${defaultAppChain.shortName}. Token: ${tokenAddress}.`
     )
+  }
+
+  if (!usesPermit2) {
+    onStep('allowance', {
+      status: 'complete',
+      detail: `${paymentTokenSymbol} balance is sufficient. This token uses ${paymentTokenTransferMethod} signatures, so no Permit2 approval is needed.`
+    })
+    return
   }
 
   if (allowance >= requiredAmount) {
@@ -2399,7 +2416,7 @@ async function ensurePermit2Allowance(
 
   onStep('allowance', {
     status: 'active',
-    detail: 'Waiting for USDC allowance to update.',
+    detail: `Waiting for ${paymentTokenSymbol} allowance to update.`,
     txHash: transactionHash
   })
   onStatus(
@@ -2457,19 +2474,13 @@ function getPreferredPaymentRequirement(paymentRequired: PaymentRequired) {
   )
 }
 
-function getPermit2Requirement(paymentRequired: PaymentRequired) {
-  return paymentRequired.accepts.find(
-    requirement =>
-      isPermit2PaymentRequirement(requirement) &&
-      isConfiguredPaymentRequirement(requirement)
-  )
+function getConfiguredPaymentRequirement(paymentRequired: PaymentRequired) {
+  return paymentRequired.accepts.find(isConfiguredPaymentRequirement)
 }
 
-function getMismatchedPermit2Requirement(paymentRequired: PaymentRequired) {
+function getMismatchedPaymentRequirement(paymentRequired: PaymentRequired) {
   return paymentRequired.accepts.find(
-    requirement =>
-      isPermit2PaymentRequirement(requirement) &&
-      !isConfiguredPaymentRequirement(requirement)
+    requirement => !isConfiguredPaymentRequirement(requirement)
   )
 }
 
@@ -2556,7 +2567,7 @@ async function readResponseBody(response: Response) {
   return {
     error:
       response.status === 402
-        ? 'USDC payment required.'
+        ? `${paymentTokenSymbol} payment required.`
         : 'The server returned a non-JSON response.',
     contentType,
     bodyPreview: text.slice(0, 300)

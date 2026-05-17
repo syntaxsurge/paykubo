@@ -374,7 +374,7 @@ Before creating a new helper or service file:
 ## Pages
 
 - `/` (marketing home)
-- `/pricing` (USDC API marketplace pricing and fee split)
+- `/pricing` (settlement-token API marketplace pricing and fee split)
 - `/developers`, `/developers/docs` (developer onboarding and gateway docs)
 - `/privacy`, `/terms`
 - `/dashboard`, `/agents`, `/agents/new`, `/agents/[runId]`, `/marketplace`,
@@ -442,10 +442,10 @@ Before creating a new helper or service file:
   `POST /api/orders/[orderId]/provider-status` retries the provider call for
   paid failed orders that still have a retryable/refundable settled request,
   without creating a second buyer payment.
-- `GET /api/receipts/[receiptId]` — returns a USDC settlement receipt record.
+- `GET /api/receipts/[receiptId]` — returns a settlement receipt record.
 - `POST /api/credits/accounts` — creates or returns a managed credit account and
   managed-credit API key for a wallet.
-- `POST /api/credits/top-ups` — records a USDC top-up transaction hash and
+- `POST /api/credits/top-ups` — records a settlement-token top-up transaction hash and
   increases the wallet's managed credit balance.
 - `POST /api/credits/products/[slug]/call` — calls a product with a API key,
   reserves managed credits before provider work starts, releases the reservation
@@ -469,7 +469,7 @@ Before creating a new helper or service file:
   current server-side run store and attempts the same stop/refund behavior as
   single-run deletion for each selected row.
 - `POST /api/agents/runs/[runId]/funding/prepare` — prepares a production agent
-  run vault funding payload with run ID, USDC token, vault address, budget
+  run vault funding payload with run ID, settlement token, vault address, budget
   amount, authorized agent signer, and expiry.
 - `POST /api/agents/runs/[runId]/funding/confirm` — records the wallet funding
   and approval transactions for a production agent run budget.
@@ -480,7 +480,7 @@ Before creating a new helper or service file:
 - `POST /api/agents/runs/[runId]/execute` — runs the autonomous workflow,
   calling selected product x402 product endpoints with the configured funded
   production agent spender, using the current app origin for hosted x402 calls,
-  preparing the agent signer's USDC Permit2 allowance when required, and
+  preparing the agent signer's settlement-token Permit2 allowance when required, and
   returning detailed payment or provider failures for action diagnostics.
 - `POST /api/agents/runs/[runId]/attest` — hashes completed run metadata and
   writes the proof to the configured AgentRunAttestor when available.
@@ -489,13 +489,13 @@ Before creating a new helper or service file:
 - `GET /api/x402/products/[slug]/call` and `POST /api/x402/products/[slug]/call`
   — protect product calls with x402, return HTTP 402 payment requirements for
   unpaid requests, quote credit-metered requests before payment, verify and
-  settle signed USDC payments through the configured facilitator, start
+  settle signed payment-token transfers through the configured facilitator, start
   credit-metered async provider work only after settlement, send the order's
   provider idempotency key to upstream POST endpoints, return paid provider
   responses or pollable job records, and attach receipt metadata.
 - `POST /api/x402/orders/[orderId]/claim` — protects metered result release with
   x402 when final provider usage exceeds the prepaid quote, settles the delta in
-  USDC, unlocks the stored provider result, and records a delta receipt.
+  the configured settlement token, unlocks the stored provider result, and records a delta receipt.
 - `POST /api/providers/openapi/preview` — imports a hosted or uploaded OpenAPI
   JSON/YAML document and returns paid-listing candidates with inferred endpoint
   URL, method, auth type, schemas, reference payload, async polling paths, and
@@ -627,23 +627,23 @@ Before creating a new helper or service file:
   research, documentation, readiness, and creative workflows, including
   video-first launch campaigns that combine public data scans with async
   media-generation tools when budget allows. Agent runs require the owner to
-  fund the `AgentRunVault` with USDC before the configured agent signer can
+  fund the `AgentRunVault` with the configured settlement token before the configured agent signer can
   execute x402 paid actions. The run detail client funds through the browser
   EIP-1193 wallet provider, requests the MetaMask account when needed, switches
   or adds the configured EVM network, checks the connected wallet's
-  settlement-token balance and vault allowance, submits the USDC approval when
+  settlement-token balance and vault allowance, submits the token approval when
   needed, verifies receipt success, then submits `fundRun` and verifies the
   funding receipt before confirming the run server-side. Funding confirmation
   and execution both verify the run against the current deployed vault's
   `budgetOf` state, so stale local funding records from an old vault reset to an
   unfunded state instead of attempting `recordSpend`. Before each paid action,
-  the gateway advances the quoted USDC amount from the vault to the agent signer
+  the gateway advances the quoted settlement-token amount from the vault to the agent signer
   with `recordSpend`, verifies the signer's balance, submits the required
   Permit2 approval when the allowance is insufficient, waits until the allowance
   is readable, and then executes the hosted x402 call from the same origin that
   triggered the run. If a pre-settlement failure occurs after the vault advance,
   or if an escrowed provider failure refunds the x402 payment back to the
-  signer, the gateway returns the USDC to the vault and records
+  signer, the gateway returns the settlement token to the vault and records
   `recordSpendRefund`; unrecovered settlement or refund failures stay counted as
   spent and remain visible in diagnostics. Running executions persist planner
   and per-action progress as tools move from quoted to paid to terminal states,
@@ -658,13 +658,16 @@ Before creating a new helper or service file:
   receipt records so provider dashboards and usage pages count autonomous tool
   calls in the same revenue ledger as browser and developer API calls. x402
   payment requirements use the settlement token's EIP-712 domain metadata in
-  `NEXT_PUBLIC_PAYMENT_TOKEN_NAME`, `NEXT_PUBLIC_PAYMENT_TOKEN_VERSION`, and
+  `NEXT_PUBLIC_PAYMENT_TOKEN_NAME`, `NEXT_PUBLIC_PAYMENT_TOKEN_SYMBOL`,
+  `NEXT_PUBLIC_PAYMENT_TOKEN_LABEL`, `NEXT_PUBLIC_PAYMENT_TOKEN_VERSION`, and
   `NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS`; the configured settlement token address
   comes from `NEXT_PUBLIC_PAYMENT_TOKEN_ADDRESS`, and
   `NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD` selects the x402 EVM transfer
-  mode used in payment requirements. Signed x402 payloads, Permit2 checks,
-  agent vault funding, and escrow reserves must use that token metadata for
-  facilitator verification and settlement. Vault spend and refund writes
+  mode used in payment requirements. Use `eip3009` for tokens that support
+  `transferWithAuthorization`; use `permit2` for standard ERC-20 approval and
+  Permit2 signature flows. Signed x402 payloads, Permit2 checks, agent vault
+  funding, and escrow reserves must use that token metadata for facilitator
+  verification and settlement. Vault spend and refund writes
   wait for successful transaction receipts, and refund recovery reads the
   vault's live spent amount before calling `recordSpendRefund` so retries and
   partially recovered failures do not request a larger refund than the current

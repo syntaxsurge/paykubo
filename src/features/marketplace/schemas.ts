@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { paymentTokenSymbol } from '@/lib/config/chains'
+
 export const apiProductCategories = [
   'ai',
   'data',
@@ -273,7 +275,7 @@ export function parseJsonField(value: string, fieldName: string) {
 }
 
 export function formatUsdcAmount(amount: number) {
-  return `${amount.toFixed(2)} USDC`
+  return `${amount.toFixed(2)} ${paymentTokenSymbol}`
 }
 
 export function getPlatformFee(amountUsd: number, feeBps = 500) {

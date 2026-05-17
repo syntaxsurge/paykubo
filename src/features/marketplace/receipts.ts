@@ -2,7 +2,10 @@ import {
   getProviderAmount,
   getPlatformFee
 } from '@/features/marketplace/schemas'
-import { getExplorerTransactionUrl } from '@/lib/config/chains'
+import {
+  getExplorerTransactionUrl,
+  paymentTokenSymbol
+} from '@/lib/config/chains'
 
 export type MarketplaceReceipt = {
   id: string
@@ -37,8 +40,8 @@ export type MarketplaceReceipt = {
 
 export function buildReceiptAmounts(priceUsd: number, feeBps = 500) {
   return {
-    platformFeeUsdc: `${getPlatformFee(priceUsd, feeBps).toFixed(2)} USDC`,
-    providerAmountUsdc: `${getProviderAmount(priceUsd, feeBps).toFixed(2)} USDC`
+    platformFeeUsdc: `${getPlatformFee(priceUsd, feeBps).toFixed(2)} ${paymentTokenSymbol}`,
+    providerAmountUsdc: `${getProviderAmount(priceUsd, feeBps).toFixed(2)} ${paymentTokenSymbol}`
   }
 }
 

@@ -12,6 +12,7 @@ import { resolveProductPrice } from '@/features/marketplace/pricing'
 import { getProductBySlug } from '@/features/marketplace/products'
 import {
   defaultX402FacilitatorUrl,
+  paymentTokenSymbol,
   toPaymentAssetAmount,
   x402Network
 } from '@/lib/config/chains'
@@ -115,7 +116,7 @@ const paidCallRoute: RouteConfig = {
     return {
       contentType: 'application/json',
       body: {
-        error: 'USDC payment required.',
+        error: `${paymentTokenSymbol} payment required.`,
         product: {
           slug: product.slug,
           name: product.name,
@@ -136,7 +137,7 @@ const paidCallRoute: RouteConfig = {
   settlementFailedResponseBody: (_context, settleResult) => ({
     contentType: 'application/json',
     body: {
-      error: 'USDC payment settlement failed.',
+      error: `${paymentTokenSymbol} payment settlement failed.`,
       reason: settleResult.errorReason,
       message: settleResult.errorMessage
     }
@@ -169,8 +170,7 @@ const claimRoute: RouteConfig = {
     },
     maxTimeoutSeconds: x402MaxTimeoutSeconds
   },
-  description:
-    'USDC-settled Result claim for credit-metered API usage that exceeded the prepaid quote.',
+  description: `${paymentTokenSymbol}-settled result claim for credit-metered API usage that exceeded the prepaid quote.`,
   mimeType: 'application/json',
   unpaidResponseBody: async context => {
     const order = await requireClaimOrderFromContext(context)
@@ -178,7 +178,7 @@ const claimRoute: RouteConfig = {
     return {
       contentType: 'application/json',
       body: {
-        error: 'USDC delta payment required.',
+        error: `${paymentTokenSymbol} delta payment required.`,
         order: {
           id: order.id,
           productSlug: order.productSlug,
@@ -198,7 +198,7 @@ const claimRoute: RouteConfig = {
   settlementFailedResponseBody: (_context, settleResult) => ({
     contentType: 'application/json',
     body: {
-      error: 'USDC delta settlement failed.',
+      error: `${paymentTokenSymbol} delta settlement failed.`,
       reason: settleResult.errorReason,
       message: settleResult.errorMessage
     }

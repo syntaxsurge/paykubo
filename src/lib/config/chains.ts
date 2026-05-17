@@ -82,12 +82,14 @@ export const paymentTokenName =
   envClient.NEXT_PUBLIC_PAYMENT_TOKEN_NAME ?? defaultPaymentTokenDomainName
 export const paymentTokenSymbol =
   envClient.NEXT_PUBLIC_PAYMENT_TOKEN_SYMBOL ?? 'USDC'
+export const paymentTokenLabel =
+  envClient.NEXT_PUBLIC_PAYMENT_TOKEN_LABEL ?? paymentTokenSymbol
 export const paymentTokenVersion =
   envClient.NEXT_PUBLIC_PAYMENT_TOKEN_VERSION ?? '2'
 export const paymentTokenDecimals =
   envClient.NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS ?? 6
 export const paymentTokenTransferMethod =
-  envClient.NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD ?? 'permit2'
+  envClient.NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD ?? 'eip3009'
 
 export function toPaymentAssetAmount(amountUsd: number) {
   return {

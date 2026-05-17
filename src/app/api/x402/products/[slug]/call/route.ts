@@ -29,7 +29,12 @@ import { sanitizeProductRequestPayload } from '@/features/marketplace/request-pa
 import { getProviderAdapter } from '@/features/provider-adapters/registry'
 import { classifyProviderFailure } from '@/features/provider-adapters/retry-policy'
 import type { ProviderAdapterResult } from '@/features/provider-adapters/types'
-import { defaultX402FacilitatorUrl, x402Network } from '@/lib/config/chains'
+import {
+  defaultX402FacilitatorUrl,
+  paymentTokenSymbol,
+  paymentTokenTransferMethod,
+  x402Network
+} from '@/lib/config/chains'
 import {
   getApiPaymentPayTo,
   getEscrowPaymentId,
@@ -812,7 +817,7 @@ function toNextResponse(
   if (response.isHtml) {
     return new NextResponse(
       JSON.stringify({
-        error: 'USDC payment required.',
+        error: `${paymentTokenSymbol} payment required.`,
         product: {
           slug: product.slug,
           name: product.name,
@@ -880,13 +885,12 @@ async function settlePayment({
   if (!settlement) {
     return NextResponse.json(
       {
-        error: 'USDC settlement failed.',
+        error: `${paymentTokenSymbol} settlement failed.`,
         reason: 'settlement_exception',
         message:
           settlementErrorMessage ||
           'The x402 facilitator did not return a valid settlement response.',
-        guidance:
-          'Confirm the buyer wallet has USDC, native gas, and USDC Permit2 allowance on the configured network, then try again.',
+        guidance: buildDefaultSettlementGuidance(),
         settlement: {
           status: 402
         }
@@ -898,7 +902,7 @@ async function settlePayment({
   if (!settlement.success) {
     return NextResponse.json(
       {
-        error: 'USDC settlement failed.',
+        error: `${paymentTokenSymbol} settlement failed.`,
         reason: settlement.errorReason,
         message: settlement.errorMessage,
         details: settlement.response.body ?? null,
@@ -1049,7 +1053,9 @@ async function reservePrepaidEscrow({
   const escrowAddress = getApiPaymentPayTo(product)
 
   if (!requirement || !isAddress(requirement.asset)) {
-    throw new Error('Escrow payment could not read the settled USDC asset.')
+    throw new Error(
+      `Escrow payment could not read the settled ${paymentTokenSymbol} asset.`
+    )
   }
 
   if (!isAddress(escrowAddress)) {
@@ -1189,18 +1195,27 @@ function buildSettlementGuidance(
     .toLowerCase()
 
   if (haystack.includes('balance') || haystack.includes('funds')) {
-    return 'The paying wallet does not appear to have enough USDC on the configured network for this API call.'
+    return `The paying wallet does not appear to have enough ${paymentTokenSymbol} on the configured network for this API call.`
   }
 
   if (haystack.includes('allowance') || haystack.includes('permit2')) {
-    return 'The paying wallet needs to approve USDC Permit2 allowance before this x402 payment can settle.'
+    return `The paying wallet needs to approve ${paymentTokenSymbol} Permit2 allowance before this x402 payment can settle.`
   }
 
   if (haystack.includes('signature') || haystack.includes('authorization')) {
     return 'The wallet signature was rejected by settlement. Re-run the payment and approve the latest x402 signature prompt.'
   }
 
-  return 'Confirm the wallet has USDC, native gas, and USDC Permit2 allowance on the configured network, then try again.'
+  return buildDefaultSettlementGuidance()
+}
+
+function buildDefaultSettlementGuidance() {
+  const tokenReadiness =
+    paymentTokenTransferMethod === 'permit2'
+      ? `${paymentTokenSymbol} Permit2 allowance`
+      : `${paymentTokenSymbol} signature approval`
+
+  return `Confirm the wallet has ${paymentTokenSymbol}, native gas, and ${tokenReadiness} on the configured network, then try again.`
 }
 
 function describeUnknownError(error: unknown) {

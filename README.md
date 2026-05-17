@@ -135,9 +135,11 @@ Key values:
 - `NEXT_PUBLIC_X402_NETWORK=eip155:2910`
 - `NEXT_PUBLIC_PAYMENT_TOKEN_ADDRESS`
 - `NEXT_PUBLIC_PAYMENT_TOKEN_NAME`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_SYMBOL`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_LABEL`
 - `NEXT_PUBLIC_PAYMENT_TOKEN_VERSION`
 - `NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS`
-- `NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD=permit2`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD=eip3009`
 - `X402_FACILITATOR_URL=https://morph-rails-hoodi.morph.network/x402/v2`
 - `X402_FACILITATOR_ACCESS_KEY`
 - `X402_FACILITATOR_SECRET_KEY`
@@ -159,6 +161,12 @@ Key values:
 6. For x402 settlement, fund the agent run vault from the browser wallet and set
    `NEXT_PUBLIC_APP_URL` to the deployed app URL. The agent spender signs
    payments and only needs native gas for Permit2 or refund-return transactions.
+   Use `NEXT_PUBLIC_PAYMENT_TOKEN_SYMBOL` and
+   `NEXT_PUBLIC_PAYMENT_TOKEN_LABEL` to change UI copy for USDC, USDT, MUSD,
+   TestBGB, or another settlement token. Use
+   `NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD=eip3009` for tokens with
+   `transferWithAuthorization`; use `permit2` for standard ERC-20 approval
+   flows.
 
 ## Core Commands
 

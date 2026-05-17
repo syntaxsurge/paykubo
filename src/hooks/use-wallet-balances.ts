@@ -9,6 +9,7 @@ import {
   getExplorerAddressUrl,
   paymentTokenAddress,
   paymentTokenDecimals,
+  paymentTokenLabel,
   paymentTokenSymbol
 } from '@/lib/config/chains'
 
@@ -116,7 +117,7 @@ export function useWalletBalances(
       error: nativeError
     },
     stablecoin: {
-      label: 'Stablecoin',
+      label: paymentTokenLabel,
       symbol: paymentTokenSymbol,
       formattedBalance:
         stablecoinBalance === null
