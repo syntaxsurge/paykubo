@@ -1,4 +1,4 @@
-# Paykubo Build In! Payments Demo Script
+# Build In! Payments Demo Script
 
 Target length: 2 minutes maximum  
 Video format: 1920 x 1080, 16:9  
@@ -10,13 +10,13 @@ Demo URL: [DEMO_URL]
 ### 0:00-0:30 - Problem And Morph Use Case
 
 - **Start on:** `/demo`
-- **Show:** Paykubo headline, track badge, Morph Hoodi, USDC, x402 Agentic
+- **Show:** product headline, track badge, Morph Hoodi, USDC, x402 Agentic
   Payments, Philippines and Southeast Asia relevance.
 - **Voiceover:**
-  > "We are building Paykubo for the x402 Agentic Payments track. In the
+  > "We are building this product for the x402 Agentic Payments track. In the
   > Philippines and Southeast Asia, useful APIs are hard to monetize without
-  > cards, subscriptions, invoices, or private key sharing. Paykubo turns them
-  > into USDC-paid tools on Morph. Users, apps, and AI agents can call an
+  > cards, subscriptions, invoices, or private key sharing. the product turns
+  > them into USDC-paid tools on Morph. Users, apps, and AI agents can call an
   > endpoint, receive an x402 payment request, settle on Morph, and get a
   > verifiable receipt."
 
@@ -25,6 +25,7 @@ Demo URL: [DEMO_URL]
 - **Move to:** `/marketplace`
 - **Show:** Marketplace listings, price, provider, agent-ready status.
 - **Say:**
+
   > "First, the marketplace shows paid API tools that providers can publish from
   > OpenAPI specs. Provider secrets stay server-side; buyers see the payable
   > endpoint, schema, price, and use case."
@@ -33,20 +34,23 @@ Demo URL: [DEMO_URL]
   `/orders/[orderId]`
 - **Show:** Request payload, quote/payment flow, Morph/x402 requirement, result.
 - **Say:**
-  > "When a buyer runs a tool, Paykubo builds the request, quotes the cost in
-  > USDC, and protects the provider call with x402. Work starts only after the
-  > payment is verified and settled through Morph."
+
+  > "When a buyer runs a tool, the gateway builds the request, quotes the cost
+  > in USDC, and protects the provider call with x402. Work starts only after
+  > the payment is verified and settled through Morph."
 
 - **Move to:** `/receipts/[receiptId]`
 - **Show:** Buyer wallet, provider wallet, USDC amount, fee split, transaction
   hash, Morph explorer link.
 - **Say:**
+
   > "Each call creates a receipt with buyer, provider, amount, fee split,
   > product, network, and Morph transaction."
 
 - **Move to:** `/agents` or `/agents/[runId]`
 - **Show:** Agent objective, budget, selected tools, paid actions, receipts.
 - **Say:**
+
   > "The agent layer uses the same payment rails. A user sets an objective and a
   > budget, the agent selects agent-ready APIs, pays for only the actions it
   > needs, and records each paid step."
@@ -70,16 +74,16 @@ Demo URL: [DEMO_URL]
 
 ## One-Take Voiceover
 
-> "We are building Paykubo for the x402 Agentic Payments track. In the
+> "We are building this product for the x402 Agentic Payments track. In the
 > Philippines and Southeast Asia, useful APIs are hard to monetize without
-> cards, subscriptions, invoices, or private key sharing. Paykubo turns them
+> cards, subscriptions, invoices, or private key sharing. the product turns them
 > into USDC-paid tools on Morph. Users, apps, and AI agents can call an
 > endpoint, receive an x402 payment request, settle on Morph, and get a
 > verifiable receipt.
 >
 > First, the marketplace shows paid API tools that providers can publish from
 > OpenAPI specs. Provider secrets stay server-side; buyers see the payable
-> endpoint, schema, price, and use case. When a buyer runs a tool, Paykubo
+> endpoint, schema, price, and use case. When a buyer runs a tool, the gateway
 > builds the request, quotes the cost in USDC, and protects the provider call
 > with x402. Work starts only after the payment is verified and settled through
 > Morph.
@@ -88,9 +92,9 @@ Demo URL: [DEMO_URL]
 > network, and Morph transaction.
 >
 > The agent layer uses the same payment rails. A user sets an objective and a
-> budget, the agent selects agent-ready APIs, pays for only the actions it needs,
-> and records each paid step. The public proof page makes the run auditable
-> without exposing private API keys or provider secrets.
+> budget, the agent selects agent-ready APIs, pays for only the actions it
+> needs, and records each paid step. The public proof page makes the run
+> auditable without exposing private API keys or provider secrets.
 >
 > Next, we will add more Philippine and Southeast Asian providers, stronger
 > agent templates for local business workflows, and production analytics. The

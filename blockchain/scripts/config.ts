@@ -1,5 +1,5 @@
 /**
- * Paykubo deployment configuration
+ * Deployment configuration
  *
  * In CI and production you **must** supply all three addresses via the
  * environment. Local scripts leave optional role addresses unset when the

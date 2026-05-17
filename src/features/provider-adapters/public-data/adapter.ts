@@ -19,7 +19,7 @@ type FetchJsonResult =
   | { ok: false; status: number; data: unknown; message: string }
 
 export const publicDataAdapter: ProviderAdapter = {
-  id: 'paykubo-public-data',
+  id: 'public-data',
   async call(input) {
     switch (input.productSlug) {
       case 'public-wikipedia-context':
@@ -379,7 +379,7 @@ async function fetchJson(url: URL): Promise<FetchJsonResult> {
     const response = await fetch(url, {
       headers: {
         Accept: 'application/json',
-        'User-Agent': 'Paykubo public-data gateway (https://paykubo.com)'
+        'User-Agent': 'API commerce public-data gateway (https://platform.com)'
       },
       signal: AbortSignal.timeout(PUBLIC_DATA_TIMEOUT_MS)
     })

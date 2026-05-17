@@ -10,7 +10,7 @@ import { getProductBySlug } from '@/features/marketplace/products'
 import { envServer } from '@/lib/env/env.server'
 
 export const AGENT_PLANNER_PROMPT = [
-  'You are Paykubo Launch Pack Agent.',
+  'You are Launch Pack Agent.',
   'Goal: choose the smallest useful set of paid API tools that can complete the user objective inside the USDC budget.',
   'Rules:',
   '1. Prefer real data/research tools before expensive media tools.',
@@ -255,7 +255,7 @@ async function buildOpenAiAgentPlan(
       text: {
         format: {
           type: 'json_schema',
-          name: 'paykubo_agent_plan',
+          name: 'app_agent_plan',
           strict: true,
           schema: buildOpenAiPlanSchema(availableProducts, run.maxPaidActions)
         }

@@ -226,7 +226,7 @@ export function ProviderProductForm() {
             name='slug'
             defaultValue=''
             error={fieldErrors.slug}
-            help='Stable URL identifier for the Paykubo endpoint. Use lowercase letters, numbers, and hyphens.'
+            help='Stable URL identifier for the gateway endpoint. Use lowercase letters, numbers, and hyphens.'
           />
           <SelectField
             label='Category'
@@ -247,7 +247,7 @@ export function ProviderProductForm() {
             type='url'
             defaultValue=''
             error={fieldErrors.endpointUrl}
-            help='The real upstream URL Paykubo forwards paid requests to after settlement.'
+            help='The real upstream URL the gateway forwards paid requests to after settlement.'
           />
           <SelectField
             label='HTTP method'
@@ -293,7 +293,8 @@ export function ProviderProductForm() {
             <p className='text-foreground/65 mt-2 max-w-3xl text-sm leading-6'>
               Use fixed pricing for simple APIs. Use credit-metered pricing for
               variable-cost APIs where a quote or job response returns a numeric
-              usage value that Paykubo converts into USDC before x402 payment.
+              usage value that the gateway converts into USDC before x402
+              payment.
             </p>
           </div>
           <span className='border-border bg-background/70 text-foreground/70 inline-flex w-fit rounded-full border px-3 py-1 text-xs font-semibold'>
@@ -332,7 +333,7 @@ export function ProviderProductForm() {
             defaultValue=''
             required={false}
             error={fieldErrors.pricingQuoteEndpointUrl}
-            help='Optional provider quote endpoint Paykubo calls before x402 payment to calculate usage-based price from the request payload.'
+            help='Optional provider quote endpoint the gateway calls before x402 payment to calculate usage-based price from the request payload.'
           />
           <SelectField
             label='Quote method'
@@ -412,8 +413,8 @@ export function ProviderProductForm() {
             docId='section-provider-authentication'
           />
           <p className='text-foreground/65 mt-2 text-sm leading-6'>
-            Paykubo keeps this credential server-side and uses it only when a
-            paid buyer request is forwarded to the provider API.
+            the gateway keeps this credential server-side and uses it only when
+            a paid buyer request is forwarded to the provider API.
           </p>
         </div>
         <div className='grid gap-4 md:grid-cols-2'>
@@ -424,7 +425,7 @@ export function ProviderProductForm() {
             value={authType}
             onChange={value => setAuthType(value as ApiProductAuthType)}
             error={fieldErrors.authType}
-            help='How Paykubo authenticates to the upstream provider API.'
+            help='How the gateway authenticates to the upstream provider API.'
           >
             {apiProductAuthTypes.map(type => (
               <option key={type} value={type}>
@@ -439,7 +440,7 @@ export function ProviderProductForm() {
             defaultValue=''
             required={authSecretIsRequired}
             error={fieldErrors.authSecret}
-            help='Provider API key or token. Imported OpenAPI operations that declare bearer or API-key security require this secret before Paykubo can forward paid calls.'
+            help='Provider API key or token. Imported OpenAPI operations that declare bearer or API-key security require this secret before the gateway can forward paid calls.'
           />
           <Field
             label='Header name'
@@ -540,7 +541,7 @@ export function ProviderProductForm() {
             type='number'
             defaultValue='60'
             error={fieldErrors.timeoutSeconds}
-            help='Maximum time Paykubo waits for the upstream provider response.'
+            help='Maximum time the gateway waits for the upstream provider response.'
           />
         </div>
       </Card>
@@ -555,7 +556,7 @@ export function ProviderProductForm() {
           <p className='text-foreground/65 mt-2 text-sm leading-6'>
             Fill this only for async APIs that return a provider job ID. For
             long-running generation, rendering, data export, or enrichment jobs,
-            import OpenAPI and Paykubo fills the likely polling URL and JSON
+            import OpenAPI and the gateway fills the likely polling URL and JSON
             paths. Fast quote/read endpoints can stay synchronous and leave this
             section blank.
           </p>
@@ -576,7 +577,7 @@ export function ProviderProductForm() {
             defaultValue='GET'
             required={isAsyncProduct}
             error={fieldErrors.statusMethod}
-            help='HTTP method Paykubo uses to poll the upstream job status.'
+            help='HTTP method the gateway uses to poll the upstream job status.'
           >
             <option value='GET'>GET</option>
             <option value='POST'>POST</option>
@@ -587,7 +588,7 @@ export function ProviderProductForm() {
             defaultValue='jobId'
             required={isAsyncProduct}
             error={fieldErrors.externalJobIdPath}
-            help='Dot-path where Paykubo finds the provider job ID in the first response.'
+            help='Dot-path where the gateway finds the provider job ID in the first response.'
           />
           <Field
             label='Status path'
@@ -595,7 +596,7 @@ export function ProviderProductForm() {
             defaultValue='status'
             required={isAsyncProduct}
             error={fieldErrors.statusPath}
-            help='Dot-path where Paykubo reads completed, processing, or failed status.'
+            help='Dot-path where the gateway reads completed, processing, or failed status.'
           />
           <Field
             label='Result URL path'
@@ -603,7 +604,7 @@ export function ProviderProductForm() {
             defaultValue='resultUrl'
             required={false}
             error={fieldErrors.resultUrlPath}
-            help='Dot-path where Paykubo reads the final output URL when available.'
+            help='Dot-path where the gateway reads the final output URL when available.'
           />
           <Field
             label='Error message path'
@@ -611,7 +612,7 @@ export function ProviderProductForm() {
             defaultValue='errorMessage'
             required={false}
             error={fieldErrors.errorMessagePath}
-            help='Dot-path where Paykubo reads provider error details.'
+            help='Dot-path where the gateway reads provider error details.'
           />
         </div>
       </Card>
@@ -824,10 +825,10 @@ function OpenApiImportPanel({
           </p>
           <h2 className='font-display mt-2 text-2xl'>Import OpenAPI</h2>
           <p className='text-foreground/65 mt-2 text-sm leading-6'>
-            Paste an OpenAPI JSON/YAML URL or upload a spec file. Paykubo reads
-            the operations, detects auth and async jobs, links job-creation
-            endpoints to status endpoints, then fills the listing fields for the
-            selected endpoint.
+            Paste an OpenAPI JSON/YAML URL or upload a spec file. the gateway
+            reads the operations, detects auth and async jobs, links
+            job-creation endpoints to status endpoints, then fills the listing
+            fields for the selected endpoint.
           </p>
         </div>
         <DocumentationLink docId='section-openapi-import' label='Open docs' />
@@ -937,7 +938,7 @@ function OpenApiImportPanel({
             defaultValue={selectedPollingCandidate?.id ?? ''}
             required={false}
             disabled={!selectedCandidate?.pollingOptions.length}
-            help='For async operations, choose the imported OpenAPI endpoint Paykubo should poll with the job ID returned by the selected operation.'
+            help='For async operations, choose the imported OpenAPI endpoint the gateway should poll with the job ID returned by the selected operation.'
             value={selectedPollingCandidate?.id ?? ''}
             onChange={setSelectedPollingId}
           >

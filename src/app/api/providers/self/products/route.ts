@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
   if (!isCompleteProviderProfile(profile)) {
     return NextResponse.json(
-      { error: 'Complete your Paykubo profile before creating API products.' },
+      { error: 'Complete your profile before creating API products.' },
       { status: 403 }
     )
   }

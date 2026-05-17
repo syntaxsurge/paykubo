@@ -67,7 +67,7 @@ export function AgentRunCreateForm({
     : undefined
   const selectionStorageKey = useMemo(
     () =>
-      `paykubo:agent-create:selected-tools:${template?.id ?? initialTool ?? 'blank'}`,
+      `app:agent-create:selected-tools:${template?.id ?? initialTool ?? 'blank'}`,
     [initialTool, template?.id]
   )
   const [selectedTools, setSelectedTools] = useState<AgentToolSlug[]>(() =>
@@ -116,7 +116,7 @@ export function AgentRunCreateForm({
       }
 
       window.sessionStorage.setItem(
-        `paykubo:agent-run:${run.id}`,
+        `app:agent-run:${run.id}`,
         JSON.stringify(run)
       )
       window.sessionStorage.removeItem(selectionStorageKey)
@@ -251,7 +251,7 @@ export function AgentRunCreateForm({
                   <Badge>Auto catalog</Badge>
                 </div>
                 <p className='text-foreground/60 mt-2 text-sm leading-6'>
-                  Paykubo sends the run intent to the backend. The planner sees
+                  the app sends the run intent to the backend. The planner sees
                   the current agent-ready catalog, quotes each selected tool,
                   skips irrelevant or over-budget calls, and records receipts
                   only for paid actions it executes.
@@ -337,7 +337,7 @@ export function AgentRunCreateForm({
                   {toolMode === 'ai'
                     ? 'OpenAI chooses relevant tools from the server-side agent-ready catalog.'
                     : 'OpenAI chooses only from the manually selected tools.'}{' '}
-                  Paykubo still quotes, pays, and records receipts.
+                  the gateway still quotes, pays, and records receipts.
                 </p>
               </div>
               <Button
@@ -357,8 +357,8 @@ export function AgentRunCreateForm({
             </div>
             {!isConnected || !address ? (
               <p className='border-foreground/10 bg-muted/30 text-foreground/70 rounded-lg border p-3 text-sm leading-6'>
-                Connect your wallet first so Paykubo can assign ownership and
-                prepare the funded budget vault.
+                Connect your wallet first so the gateway can assign ownership
+                and prepare the funded budget vault.
               </p>
             ) : null}
             {error ? (

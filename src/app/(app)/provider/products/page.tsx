@@ -100,7 +100,7 @@ export default async function ProviderProductsPage({
         totalPages={table.totalPages}
         searchPlaceholder='Search listings, providers, endpoints, statuses, or categories'
         emptyTitle='No API products yet'
-        emptyDescription='Create a listing to expose an external API through Paykubo.'
+        emptyDescription='Create a listing to expose an external API through the gateway.'
         bulkActions={[
           {
             label: 'Delete selected',

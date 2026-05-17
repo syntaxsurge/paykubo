@@ -8,13 +8,13 @@ import { omitIndexedCharacterMaps } from '@/lib/utils/json-payload'
 const maxOrderSnapshotBytes = 500_000
 
 export function storeMarketplaceOrderSnapshot(order: MarketplaceOrder) {
-  safeSetSessionItem(`paykubo:order:${order.id}`, order, () =>
+  safeSetSessionItem(`app:order:${order.id}`, order, () =>
     createCompactOrderSnapshot(order)
   )
 }
 
 export function storeMarketplaceReceiptSnapshot(receipt: MarketplaceReceipt) {
-  safeSetSessionItem(`paykubo:receipt:${receipt.id}`, receipt)
+  safeSetSessionItem(`app:receipt:${receipt.id}`, receipt)
 }
 
 function safeSetSessionItem(

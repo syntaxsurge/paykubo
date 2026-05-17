@@ -1,4 +1,4 @@
-# Paykubo Deployment Checklist
+# Deployment Checklist
 
 Use this checklist before operating the app.
 
@@ -65,8 +65,7 @@ pnpm build
   for a run.
 - `POST /api/agents/runs/[runId]/refund` records unused agent budget refunds
   after terminal states.
-- `POST /api/agents/runs/[runId]/attest` returns a proof with an explorer
-  link.
+- `POST /api/agents/runs/[runId]/attest` returns a proof with an explorer link.
 - `GET /api/proofs/[proofId]` returns the public proof package.
 - `POST /api/x402/products/{published-product-slug}/call` without `X-PAYMENT`
   returns HTTP 402 and a `payment-required` header.
@@ -77,7 +76,8 @@ pnpm build
   `POST /api/x402/orders/{orderId}/claim` when final usage requires a delta.
 - Async provider listings that return editable project or workflow handoffs
   expose a public result URL such as `result.publicProjectUrl` or
-  `result.cloneUrl`; Paykubo treats that handoff as the completed paid result.
+  `result.cloneUrl`; the gateway treats that handoff as the completed paid
+  result.
 - Retryable provider outages such as temporary 5xx, Cloudflare, timeout,
   rate-limit, or provider-marked `retryable: true` responses keep escrow
   reserved and retry for up to 24 hours before refunding.

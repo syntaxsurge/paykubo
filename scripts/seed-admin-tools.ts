@@ -33,9 +33,9 @@ if (!convexUrl) {
 const client = new ConvexHttpClient(convexUrl)
 const profile = await client.mutation(api.users.upsertProfile, {
   walletAddress: adminWallet,
-  fullName: process.env.ADMIN_TOOLS_PROVIDER_NAME ?? 'Paykubo Labs',
-  username: process.env.ADMIN_TOOLS_PROVIDER_USERNAME ?? 'paykubo-labs',
-  email: process.env.ADMIN_TOOLS_PROVIDER_EMAIL ?? 'hello@paykubo.com',
+  fullName: process.env.ADMIN_TOOLS_PROVIDER_NAME ?? 'Provider Labs',
+  username: process.env.ADMIN_TOOLS_PROVIDER_USERNAME ?? 'platform-labs',
+  email: process.env.ADMIN_TOOLS_PROVIDER_EMAIL ?? 'hello@example.com',
   plan: 'plus'
 })
 

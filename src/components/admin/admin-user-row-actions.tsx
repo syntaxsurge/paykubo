@@ -255,9 +255,9 @@ function DeleteUserDialog({
           <p className='text-foreground/65 mt-2 text-sm leading-6'>
             Deleting {user.displayName} removes this wallet from the
             server-rendered admin table and clears it from normal user
-            operations. Paykubo stores admin edits as server-readable overrides;
-            production backends should apply the same confirmation before
-            deleting persisted records.
+            operations. the gateway stores admin edits as server-readable
+            overrides; production backends should apply the same confirmation
+            before deleting persisted records.
           </p>
           <p className='text-foreground/70 mt-3 font-mono text-xs break-all'>
             {user.walletAddress}

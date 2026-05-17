@@ -93,7 +93,7 @@ export default async function NewAgentRunPage({
               <p className='text-foreground/70 max-w-2xl text-sm leading-6'>
                 {template
                   ? template.summary
-                  : 'Start blank or choose a template from the agents page. OpenAI plans; Paykubo pays and proves.'}
+                  : 'Start blank or choose a template from the agents page. OpenAI plans; the gateway pays and proves.'}
               </p>
             </div>
           </div>

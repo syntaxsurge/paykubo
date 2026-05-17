@@ -220,7 +220,7 @@ function OrderCreateFormFields({
             </p>
             <h2 className='text-2xl font-semibold'>Build a payable API call</h2>
             <p className='text-foreground/65 mt-2 max-w-2xl text-sm leading-6'>
-              Fill the fields generated from this listing schema. Paykubo
+              Fill the fields generated from this listing schema. The gateway
               creates a payable order first; the wallet payment happens on the
               Run & Pay page before the provider receives the request.
             </p>

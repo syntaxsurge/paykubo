@@ -94,9 +94,9 @@ export function getAdminUserSeed() {
     return {
       id: address,
       walletAddress: address,
-      displayName: 'Paykubo Labs',
-      username: 'paykubo',
-      email: 'hello@paykubo.com',
+      displayName: 'Provider Labs',
+      username: 'platform',
+      email: 'hello@example.com',
       role: 'admin',
       plan: 'free',
       status: 'active',

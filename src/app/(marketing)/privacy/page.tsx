@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card'
 const sections = [
   {
     title: 'Default collection',
-    body: 'Paykubo keeps wallet connection state local for route protection and uses Convex-backed records for marketplace data.'
+    body: 'the gateway keeps wallet connection state local for route protection and uses Convex-backed records for marketplace data.'
   },
   {
     title: 'Wallet data',

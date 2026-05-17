@@ -1,5 +1,5 @@
 {
-  "name": "paykubo-blockchain",
+  "name": "evm-contracts",
   "license": "MIT",
   "scripts": {
     "compile": "hardhat compile",

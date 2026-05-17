@@ -149,7 +149,7 @@ function AgentRunContent({
       return
     }
 
-    const saved = window.sessionStorage.getItem(`paykubo:agent-run:${runId}`)
+    const saved = window.sessionStorage.getItem(`app:agent-run:${runId}`)
 
     if (saved) {
       setRun(JSON.parse(saved) as AgentRun)
@@ -462,19 +462,19 @@ function AgentRunContent({
   function persistRun(nextRun: AgentRun) {
     try {
       window.sessionStorage.setItem(
-        `paykubo:agent-run:${nextRun.id}`,
+        `app:agent-run:${nextRun.id}`,
         JSON.stringify(nextRun)
       )
       nextRun.actions.forEach(action => {
         if (action.receipt) {
           window.sessionStorage.setItem(
-            `paykubo:receipt:${action.receipt.id}`,
+            `app:receipt:${action.receipt.id}`,
             JSON.stringify(action.receipt)
           )
         }
       })
     } catch {
-      window.sessionStorage.removeItem(`paykubo:agent-run:${nextRun.id}`)
+      window.sessionStorage.removeItem(`app:agent-run:${nextRun.id}`)
     }
 
     setRun(nextRun)
@@ -545,7 +545,7 @@ async function requestFundingWalletAddress(expectedAddress: string | null) {
 
   if (!provider) {
     throw new Error(
-      'MetaMask was not detected. Open Paykubo in a browser with MetaMask installed, then click Fund agent again.'
+      'MetaMask was not detected. Open the app in a browser with MetaMask installed, then click Fund agent again.'
     )
   }
 
@@ -570,7 +570,7 @@ async function requestFundingWalletAddress(expectedAddress: string | null) {
     throw new Error(
       `MetaMask is using ${shorten(
         selectedAddress
-      )}, but this Paykubo session is connected as ${shorten(
+      )}, but this app session is connected as ${shorten(
         expectedAddress
       )}. Switch MetaMask to the connected wallet, then fund again.`
     )
@@ -834,7 +834,7 @@ function StatusNotice({
           </p>
           {run.status === 'failed' && completedPaidActions === 0 ? (
             <p className='mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm leading-6 text-red-600 dark:text-red-300'>
-              No paid tool completed with a receipt, so Paykubo is showing
+              No paid tool completed with a receipt, so the gateway is showing
               diagnostics instead of treating generated copy as verified output.
             </p>
           ) : null}
@@ -1394,7 +1394,7 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
                 message:
                   action.errorMessage ??
                   (action.status === 'paid'
-                    ? 'The paid request is running. Paykubo is waiting for the provider response.'
+                    ? 'The paid request is running. the gateway is waiting for the provider response.'
                     : 'No response payload recorded yet.')
               }
             }

@@ -52,7 +52,7 @@ export function AgentRunRowActions({ run }: { run: AgentRun }) {
         throw new Error(body?.error ?? 'Unable to delete this agent run.')
       }
 
-      window.sessionStorage.removeItem(`paykubo:agent-run:${run.id}`)
+      window.sessionStorage.removeItem(`app:agent-run:${run.id}`)
       const row = document.querySelector(
         `[data-table-row-id="${CSS.escape(run.id)}"]`
       )
@@ -139,8 +139,8 @@ export function AgentRunRowActions({ run }: { run: AgentRun }) {
           <div className='rounded-lg border border-red-500/25 bg-red-500/10 p-4'>
             <p className='font-semibold'>Delete {run.title}?</p>
             <p className='text-foreground/65 mt-2 text-sm leading-6'>
-              If this run has unused budget, Paykubo will attempt to cancel the
-              run and refund the remaining vault balance.
+              If this run has unused budget, the gateway will attempt to cancel
+              the run and refund the remaining vault balance.
             </p>
             <p className='text-foreground/70 mt-3 font-mono text-xs break-all'>
               {run.id}

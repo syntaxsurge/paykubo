@@ -103,8 +103,8 @@ explicitly told otherwise:
     `blockchain/.env.example` as a template.
 - Use **Convex** as the off-chain backend stack.
 - Support a **Hardhat blockchain workspace** under `blockchain/` with a
-  configured EVM-network `SubscriptionManager.sol` as the canonical Solidity contract and
-  frontend subscription helpers in `src/lib/contracts/`.
+  configured EVM-network `SubscriptionManager.sol` as the canonical Solidity
+  contract and frontend subscription helpers in `src/lib/contracts/`.
 - Keep **caching explicit** in Next.js 15:
   - `GET` Route Handlers are **not cached by default**.
   - `fetch` is **`no-store` by default** in many server contexts.
@@ -128,8 +128,7 @@ Use this as the **default template**. Extend or trim as needed. Folders marked
 ├─ public/
 │  ├─ favicon.ico
 │  ├─ icons/
-│  ├─ images/
-│  └─ manifest.webmanifest
+│  └─ images/
 ├─ blockchain/                   # OPTIONAL: smart-contract workspace (only if using blockchain)
 │  ├─ .env.example               # Template for blockchain/.env (Hardhat secrets)
 │  ├─ contracts/
@@ -195,6 +194,7 @@ Use this as the **default template**. Extend or trim as needed. Folders marked
    │  ├─ error.tsx               # Root segment error boundary
    │  ├─ global-error.tsx        # Global error boundary
    │  ├─ not-found.tsx           # 404 for App Router
+   │  ├─ manifest.ts             # Dynamic web app manifest
    │  ├─ sitemap.ts              # Dynamic sitemap
    │  └─ robots.ts               # Dynamic robots.txt
    ├─ components/                # Cross-route, reusable UI
@@ -373,7 +373,7 @@ Before creating a new helper or service file:
 
 ## Pages
 
-- `/` (Paykubo marketing home)
+- `/` (marketing home)
 - `/pricing` (USDC API marketplace pricing and fee split)
 - `/developers`, `/developers/docs` (developer onboarding and gateway docs)
 - `/privacy`, `/terms`
@@ -393,9 +393,9 @@ Before creating a new helper or service file:
   cookies used by protected app routes and return the connected wallet's Convex
   user profile when available; successful browser wallet connections redirect
   public-page users to `/dashboard` after the session is synced.
-- `GET /api/health` — returns Paykubo readiness checks for the configured EVM
-  network, x402, wallet
-  onboarding, external API forwarding, marketplace listings, and receipts.
+- `GET /api/health` — returns readiness checks for the configured EVM network,
+  x402, wallet onboarding, external API forwarding, marketplace listings, and
+  receipts.
 - `POST /api/webhooks` — records inbound webhook events to Convex with source,
   event type, sanitized headers, raw payload text, and parsed JSON payload when
   available.
@@ -410,7 +410,7 @@ Before creating a new helper or service file:
   user directory rows through the shared server-fed table bulk action contract.
 - `POST /api/admin/products/bulk-delete` — allows admin wallets to delete
   selected provider-created products through the shared server-fed table; static
-  Paykubo public data products are not removed by this endpoint.
+  public data products are not removed by this endpoint.
 - `POST /api/admin/orders/bulk-delete` — allows admin wallets to delete selected
   marketplace order records from the persisted admin ledger.
 - `POST /api/providers/self/products` — validates provider API product input,
@@ -444,14 +444,14 @@ Before creating a new helper or service file:
   without creating a second buyer payment.
 - `GET /api/receipts/[receiptId]` — returns a USDC settlement receipt record.
 - `POST /api/credits/accounts` — creates or returns a managed credit account and
-  Paykubo API key for a wallet.
+  managed-credit API key for a wallet.
 - `POST /api/credits/top-ups` — records a USDC top-up transaction hash and
   increases the wallet's managed credit balance.
-- `POST /api/credits/products/[slug]/call` — calls a product with a Paykubo API
-  key, reserves managed credits before provider work starts, releases the
-  reservation on provider failure, settles lower final usage back to the credit
-  balance, sends a stable provider idempotency key to upstream POST endpoints,
-  and records a receipt linked to the top-up transaction.
+- `POST /api/credits/products/[slug]/call` — calls a product with a API key,
+  reserves managed credits before provider work starts, releases the reservation
+  on provider failure, settles lower final usage back to the credit balance,
+  sends a stable provider idempotency key to upstream POST endpoints, and
+  records a receipt linked to the top-up transaction.
 - `GET /api/agents/runs` and `POST /api/agents/runs` — list and create
   autonomous agent runs with optional template ID, objective, source context,
   owner wallet, budget cap, max paid actions, and tool selection mode. AI
@@ -478,7 +478,7 @@ Before creating a new helper or service file:
 - `POST /api/agents/runs/[runId]/refund` — records or submits unused budget
   refund state after a production run reaches a terminal state.
 - `POST /api/agents/runs/[runId]/execute` — runs the autonomous workflow,
-  calling selected Paykubo x402 product endpoints with the configured funded
+  calling selected product x402 product endpoints with the configured funded
   production agent spender, using the current app origin for hosted x402 calls,
   preparing the agent signer's USDC Permit2 allowance when required, and
   returning detailed payment or provider failures for action diagnostics.
@@ -507,7 +507,7 @@ Before creating a new helper or service file:
   preview. Order detail pages render this trace in a collapsed JSON diagnostic
   panel so listing owners can reproduce upstream calls without exposing provider
   secrets.
-- `GET /api/openapi.json` — returns the Paykubo OpenAPI document.
+- `GET /api/openapi.json` — returns the OpenAPI document.
 - `GET /api/reference` — serves the Scalar API reference for the OpenAPI
   document.
 
@@ -553,8 +553,8 @@ Before creating a new helper or service file:
   helpers live in `src/lib/table/server-table.ts` and are used by agent
   templates/runs, marketplace products, orders, and provider product management.
 - Shared site header in `src/components/layout/site-header.tsx` across marketing
-  and app shells, with Paykubo logo branding, public navigation, theme controls,
-  a server-verified admin shortcut for allowlisted active wallets, and an avatar
+  and app shells, with app logo branding, public navigation, theme controls, a
+  server-verified admin shortcut for allowlisted active wallets, and an avatar
   account menu. The account menu shows wallet-scoped profile identity and
   dashboard/profile/settings shortcuts only when a wallet is connected, and
   keeps the active RainbowKit wallet control available without occupying
@@ -568,15 +568,17 @@ Before creating a new helper or service file:
   persist through `/api/settings/profile` into the Convex `users` table and
   hydrate client displays through `src/hooks/use-user-settings.ts`; browser
   localStorage is not used for profile persistence.
-- The app favicon is generated from the Paykubo logo and lives only at
+- The app favicon is generated from the app logo and lives only at
   `src/app/favicon.ico`; public image branding lives at
-  `public/images/paykubo-logo.png`.
+  `public/images/app-logo.png`. The web app manifest is generated from
+  `src/app/manifest.ts` and uses `NEXT_PUBLIC_APP_NAME` through
+  `src/lib/config/site.ts`.
 - Authenticated app routes use compact icon-led sidebars in
   `src/components/layout/app-sidebar.tsx` and
   `src/components/layout/admin-sidebar.tsx` for workspace and admin navigation.
-- Paykubo marketplace product registry, provider-created listings, product
-  schemas, upstream auth metadata, async polling mappings, prices, x402 flags,
-  and dashboard metrics live in `src/features/marketplace/products.ts`; reusable
+- Marketplace product registry, provider-created listings, product schemas,
+  upstream auth metadata, async polling mappings, prices, x402 flags, and
+  dashboard metrics live in `src/features/marketplace/products.ts`; reusable
   marketplace cards live in `src/features/marketplace/product-card.tsx`.
   Subscription plan metadata and tier fee splits live in
   `src/lib/contracts/subscription.ts`: Free providers keep 95%, Base providers
@@ -588,11 +590,11 @@ Before creating a new helper or service file:
   provider profile plan through `src/features/marketplace/provider-fees.ts`,
   default to Free when no saved plan exists, and store the provider plan,
   platform fee bps, provider share bps, platform fee amount, and provider amount
-  on successful receipts. Seeded Paykubo Labs public data wrappers for Wikipedia
+  on successful receipts. Seeded provider public data wrappers for Wikipedia
   search, Hacker News trend search, GitHub repository search, npm package
   search, OpenAlex research search, and GDELT news search use no upstream
-  account or API key, stay x402-protected as paid Paykubo marketplace products,
-  are upserted into Convex with the configured allowlisted admin wallet, and are
+  account or API key, stay x402-protected as paid Marketplace products, are
+  upserted into Convex with the configured allowlisted admin wallet, and are
   agent-ready for no-key public-data runs. Marketplace and product pages show
   the creator identity card with avatar, name, username, and wallet address for
   these products and provider-created listings. These products execute through
@@ -624,66 +626,64 @@ Before creating a new helper or service file:
   fund the `AgentRunVault` with USDC before the configured agent signer can
   execute x402 paid actions. The run detail client funds through the browser
   EIP-1193 wallet provider, requests the MetaMask account when needed, switches
-  or adds the configured EVM network, checks the connected wallet's settlement-token balance
-  and vault allowance, submits the USDC approval when needed, verifies receipt
-  success, then submits `fundRun` and verifies the funding receipt before
-  confirming the run server-side.
-  Funding confirmation and execution both verify the run against the current
-  deployed vault's `budgetOf` state, so stale local funding records from an old
-  vault reset to an unfunded state instead of attempting `recordSpend`. Before
-  each paid action, Paykubo advances the quoted
-  USDC amount from the vault to the agent signer with `recordSpend`, verifies
-  the signer's balance, submits the required Permit2 approval when the allowance
-  is insufficient, waits until the allowance is readable, and then executes the
-  hosted x402 call from the same origin that triggered the run. If a
-  pre-settlement failure occurs after the vault advance, or if an escrowed
-  provider failure refunds the x402 payment back to the signer, Paykubo returns
-  the USDC to the vault and records `recordSpendRefund`; unrecovered settlement
-  or refund failures stay counted as spent and remain visible in diagnostics.
-  Running executions persist planner and per-action progress as tools move from
-  quoted to paid to terminal states, and the run detail client auto-polls
-  `GET /api/agents/runs/[runId]` while the run is executing or attesting so
-  users can watch async progress without a manual refresh. Paid action failures
-  preserve the response body, settlement guidance, and provider details in
-  action diagnostics. Async provider actions use the same
-  `/api/orders/[orderId]/provider-status` polling path as marketplace orders;
-  queued and processing media jobs remain incomplete until the provider returns
-  a terminal result, refund state, or completed project URL. Agent-paid x402
-  calls include the agent run ID in gateway order and receipt records so
-  provider dashboards and usage pages count autonomous tool calls in the same
-  revenue ledger as browser and developer API calls. x402 payment requirements
-  use the settlement token's EIP-712 domain metadata in
+  or adds the configured EVM network, checks the connected wallet's
+  settlement-token balance and vault allowance, submits the USDC approval when
+  needed, verifies receipt success, then submits `fundRun` and verifies the
+  funding receipt before confirming the run server-side. Funding confirmation
+  and execution both verify the run against the current deployed vault's
+  `budgetOf` state, so stale local funding records from an old vault reset to an
+  unfunded state instead of attempting `recordSpend`. Before each paid action,
+  the gateway advances the quoted USDC amount from the vault to the agent signer
+  with `recordSpend`, verifies the signer's balance, submits the required
+  Permit2 approval when the allowance is insufficient, waits until the allowance
+  is readable, and then executes the hosted x402 call from the same origin that
+  triggered the run. If a pre-settlement failure occurs after the vault advance,
+  or if an escrowed provider failure refunds the x402 payment back to the
+  signer, the gateway returns the USDC to the vault and records
+  `recordSpendRefund`; unrecovered settlement or refund failures stay counted as
+  spent and remain visible in diagnostics. Running executions persist planner
+  and per-action progress as tools move from quoted to paid to terminal states,
+  and the run detail client auto-polls `GET /api/agents/runs/[runId]` while the
+  run is executing or attesting so users can watch async progress without a
+  manual refresh. Paid action failures preserve the response body, settlement
+  guidance, and provider details in action diagnostics. Async provider actions
+  use the same `/api/orders/[orderId]/provider-status` polling path as
+  marketplace orders; queued and processing media jobs remain incomplete until
+  the provider returns a terminal result, refund state, or completed project
+  URL. Agent-paid x402 calls include the agent run ID in gateway order and
+  receipt records so provider dashboards and usage pages count autonomous tool
+  calls in the same revenue ledger as browser and developer API calls. x402
+  payment requirements use the settlement token's EIP-712 domain metadata in
   `NEXT_PUBLIC_PAYMENT_TOKEN_NAME`, `NEXT_PUBLIC_PAYMENT_TOKEN_VERSION`, and
   `NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS`; the configured settlement token address
   comes from `NEXT_PUBLIC_PAYMENT_TOKEN_ADDRESS`. Signed x402 payloads, Permit2
   checks, agent vault funding, and escrow reserves must use that token metadata
-  for facilitator verification and settlement. Vault spend and refund writes wait for successful transaction
-  receipts, and refund recovery reads the vault's live spent amount before
-  calling `recordSpendRefund` so retries and partially recovered failures do not
-  request a larger refund than the current vault state can accept. Direct
-  run reads refresh from Convex by run ID before using the in-memory run cache so
-  polling clients see the latest persisted progress across server runtimes.
-  Agent action progress records the settled x402
-  order/receipt and the provider's initial response as soon as the paid request
-  is accepted, then keeps async media actions in `paid` state while polling for
-  the terminal provider output. The latest async provider-status poll is stored
-  on the action with attempt number, timestamp, polling URL, request method,
-  headers, path parameters, HTTP status, order state, result-release state,
-  external job ID, result URL when present, and compact response metadata; each
-  new backend poll replaces the prior visible snapshot instead of growing an
-  unbounded history. The run page refreshes running, attesting, and active paid
-  async runs every eight seconds, reconciles stale paid actions through the
-  provider-status endpoint using the configured public app origin, auto-resumes
-  remaining planned tools after an async action reaches a terminal state,
-  renders the latest async poll as a compact live-status disclosure without
-  poll-number timeline rows, and keeps compact request/response JSON inside
-  expandable diagnostics. Receipt, settlement, and vault transaction links
-  render as icon actions on each tool card, while public provider result links
-  render as compact host/path previews instead of full-width raw URLs. Agent and
-  marketplace snapshots persisted to Convex keep result URLs, job IDs, statuses,
-  pricing, and escrow metadata, but compact provider response bodies before
-  saving.
-  When `AGENT_LLM_API_KEY` is
+  for facilitator verification and settlement. Vault spend and refund writes
+  wait for successful transaction receipts, and refund recovery reads the
+  vault's live spent amount before calling `recordSpendRefund` so retries and
+  partially recovered failures do not request a larger refund than the current
+  vault state can accept. Direct run reads refresh from Convex by run ID before
+  using the in-memory run cache so polling clients see the latest persisted
+  progress across server runtimes. Agent action progress records the settled
+  x402 order/receipt and the provider's initial response as soon as the paid
+  request is accepted, then keeps async media actions in `paid` state while
+  polling for the terminal provider output. The latest async provider-status
+  poll is stored on the action with attempt number, timestamp, polling URL,
+  request method, headers, path parameters, HTTP status, order state,
+  result-release state, external job ID, result URL when present, and compact
+  response metadata; each new backend poll replaces the prior visible snapshot
+  instead of growing an unbounded history. The run page refreshes running,
+  attesting, and active paid async runs every eight seconds, reconciles stale
+  paid actions through the provider-status endpoint using the configured public
+  app origin, auto-resumes remaining planned tools after an async action reaches
+  a terminal state, renders the latest async poll as a compact live-status
+  disclosure without poll-number timeline rows, and keeps compact
+  request/response JSON inside expandable diagnostics. Receipt, settlement, and
+  vault transaction links render as icon actions on each tool card, while public
+  provider result links render as compact host/path previews instead of
+  full-width raw URLs. Agent and marketplace snapshots persisted to Convex keep
+  result URLs, job IDs, statuses, pricing, and escrow metadata, but compact
+  provider response bodies before saving. When `AGENT_LLM_API_KEY` is
   configured, the agent uses the OpenAI Responses API with `AGENT_LLM_MODEL` or
   `gpt-5.2` to select tools, generate request payloads, skip unrelated tools,
   reserve one affordable media tool when the objective or template requires
@@ -735,9 +735,9 @@ Before creating a new helper or service file:
   always receive `billingMode: "external_prepaid"` plus generic external prepaid
   metadata with order, receipt, buyer, requested billing mode, and settlement
   references so provider APIs can report estimated, charged, and refunded usage
-  without importing Paykubo settlement logic. Provider listings with server-side
-  auth requirements must have their upstream secret configured before Paykubo
-  creates payable orders or x402 payment requirements.
+  without importing gateway settlement logic. Provider listings with server-side
+  auth requirements must have their upstream secret configured before the
+  gateway creates payable orders or x402 payment requirements.
 - `/marketplace` lists published provider-created USDC-paid API products in the
   shared server-fed table with category filters, price badges, provider names,
   execution/result delivery context, agent-ready badges, and entry points for
@@ -802,9 +802,9 @@ Before creating a new helper or service file:
   shows buyer request lifecycle state using shared order status labels and
   descriptions from `src/features/marketplace/status.ts`; order detail pages
   sign x402 USDC payments with the connected browser wallet, check and submit
-  the required payment-token Permit2 allowance transaction when needed, verify USDC
-  balance before asking for payment signatures, wait for the approval receipt
-  and readable allowance, retry transient quote, allowance, signature,
+  the required payment-token Permit2 allowance transaction when needed, verify
+  USDC balance before asking for payment signatures, wait for the approval
+  receipt and readable allowance, retry transient quote, allowance, signature,
   settlement, claim, and provider status errors with bounded exponential backoff
   while avoiding retries after receipt or payment artifacts are returned,
   display step-by-step wallet progress as a compact icon timeline with explorer
@@ -814,23 +814,22 @@ Before creating a new helper or service file:
   API responses from async provider jobs, automatically poll provider status
   through the shared `useAutoPolling` hook when an order has an external job ID
   or a retryable provider outage, keep escrow reserved for retryable provider
-  failures such as temporary 5xx,
-  Cloudflare, timeout, rate-limit, or provider-marked retryable responses until
-  the 24-hour retry window expires, complete async orders when a provider
-  returns a completed status or cloneable handoff URL, keep manual polling
-  available, keep 402 inspection as a diagnostic action, persist receipt
-  metadata in browser session storage, show quote/reservation/final usage
-  amounts for credit-metered calls, claim metered deltas through x402 before
-  revealing locked results, show escrow reserve/release/refund transaction links
-  when a credit-metered async payment uses escrow, and link to the settlement
-  receipt and explorer transaction. Draft products stay hidden from public
-  marketplace usage but can be tested through provider management by creating
-  provider-test order records; locally persisted draft listings created before
-  owner metadata exists can still be tested through matching order records.
-  Browser session order snapshots use compact session-safe storage so large
-  provider payloads cannot block the visible order state, and provider payload
-  normalization removes malformed indexed-character maps while preserving
-  handoff URLs and billing metadata.
+  failures such as temporary 5xx, Cloudflare, timeout, rate-limit, or
+  provider-marked retryable responses until the 24-hour retry window expires,
+  complete async orders when a provider returns a completed status or cloneable
+  handoff URL, keep manual polling available, keep 402 inspection as a
+  diagnostic action, persist receipt metadata in browser session storage, show
+  quote/reservation/final usage amounts for credit-metered calls, claim metered
+  deltas through x402 before revealing locked results, show escrow
+  reserve/release/refund transaction links when a credit-metered async payment
+  uses escrow, and link to the settlement receipt and explorer transaction.
+  Draft products stay hidden from public marketplace usage but can be tested
+  through provider management by creating provider-test order records; locally
+  persisted draft listings created before owner metadata exists can still be
+  tested through matching order records. Browser session order snapshots use
+  compact session-safe storage so large provider payloads cannot block the
+  visible order state, and provider payload normalization removes malformed
+  indexed-character maps while preserving handoff URLs and billing metadata.
 - Marketplace products declare whether they are synchronous or asynchronous,
   whether settlement happens after a successful response, after job acceptance,
   or when a completed result is claimed, and whether results are returned
@@ -886,10 +885,10 @@ Before creating a new helper or service file:
   feed `/api/health` plus the admin operations page, including agent signer,
   attestor, and public proof readiness.
 - x402 network configuration uses the CAIP-2 identifier in
-  `NEXT_PUBLIC_X402_NETWORK`; the
-  resource server in `src/lib/x402/paykubo-resource-server.ts` registers the EVM
-  `exact` scheme, uses `X402_FACILITATOR_URL`, protects product call routes, and
-  resolves dollar-denominated prices to the configured payment token.
+  `NEXT_PUBLIC_X402_NETWORK`; the resource server in
+  `src/lib/x402/payment-resource-server.ts` registers the EVM `exact` scheme,
+  uses `X402_FACILITATOR_URL`, protects product call routes, and resolves
+  dollar-denominated prices to the configured payment token.
 - Walkthrough and deployment documentation lives in `docs/demo-script.md` and
   `docs/deployment-checklist.md`.
 - The admin subscriptions page reads SubscriptionManager balance, plan prices,

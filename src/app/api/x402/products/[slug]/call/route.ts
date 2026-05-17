@@ -44,9 +44,9 @@ import {
 import { envServer } from '@/lib/env/env.server'
 import { NextRequestAdapter } from '@/lib/x402/next-request-adapter'
 import {
-  getPaykuboPaywallConfig,
-  getPaykuboX402Server
-} from '@/lib/x402/paykubo-resource-server'
+  getPaymentPaywallConfig,
+  getPaymentX402Server
+} from '@/lib/x402/payment-resource-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,7 +55,7 @@ type VerifiedPaymentResult = Extract<
   { type: 'payment-verified' }
 >
 
-type PaykuboRequestContext = {
+type PaymentRequestContext = {
   adapter: NextRequestAdapter
   path: string
   method: string
@@ -97,8 +97,8 @@ async function handlePaidProductCall(
   rawPayload: unknown
 ) {
   const product = await getProductBySlug(slug)
-  const requestedOrderId = request.headers.get('x-paykubo-order-id')
-  const agentRunId = request.headers.get('x-paykubo-agent-run-id') ?? undefined
+  const requestedOrderId = request.headers.get('x-app-order-id')
+  const agentRunId = request.headers.get('x-app-agent-run-id') ?? undefined
   const existingOrder = requestedOrderId
     ? await getMarketplaceOrderById(requestedOrderId)
     : undefined
@@ -109,7 +109,7 @@ async function handlePaidProductCall(
         error: 'API product was not found.',
         message:
           product?.status === 'draft'
-            ? 'Draft products can only be tested by the provider owner from a matching Paykubo order.'
+            ? 'Draft products can only be tested by the provider owner from a matching gateway order.'
             : 'The product is not published or available for this request.'
       },
       { status: 404 }
@@ -141,11 +141,11 @@ async function handlePaidProductCall(
     method: request.method,
     paymentHeader:
       adapter.getHeader('payment-signature') ?? adapter.getHeader('x-payment')
-  } satisfies PaykuboRequestContext
-  const server = await getPaykuboX402Server()
+  } satisfies PaymentRequestContext
+  const server = await getPaymentX402Server()
   const processResult = await server.processHTTPRequest(
     context,
-    getPaykuboPaywallConfig(request.url)
+    getPaymentPaywallConfig(request.url)
   )
 
   if (processResult.type === 'payment-error') {
@@ -194,7 +194,7 @@ async function handlePaidProductCall(
         error: 'Could not price this request.',
         message: describeUnknownError(caughtError),
         guidance:
-          'Credit-metered products must expose a quote endpoint or a deterministic credit field before Paykubo can request x402 payment.'
+          'Credit-metered products must expose a quote endpoint or a deterministic credit field before the gateway can request x402 payment.'
       },
       { status: 400 }
     )
@@ -358,7 +358,7 @@ async function handlePaidProductCall(
   return NextResponse.json(finalBody, {
     headers: {
       ...settlement.headers,
-      'X-Paykubo-Receipt-Id': receiptId
+      'X-App-Receipt-Id': receiptId
     }
   })
 }
@@ -405,9 +405,9 @@ async function handlePrepaidAsyncProviderCall({
   existingOrder,
   agentRunId
 }: {
-  server: Awaited<ReturnType<typeof getPaykuboX402Server>>
+  server: Awaited<ReturnType<typeof getPaymentX402Server>>
   processResult: VerifiedPaymentResult
-  context: PaykuboRequestContext
+  context: PaymentRequestContext
   product: ProductForCall
   providerAdapter: ProviderAdapterForCall
   payload: unknown
@@ -558,7 +558,7 @@ async function handlePrepaidAsyncProviderCall({
             adapterResult.errorMessage ??
             'Provider returned a temporary error.',
           message:
-            'The provider returned a retryable temporary error after payment. Paykubo kept the payment reserved in escrow and will retry status checks until the retry window expires.',
+            'The provider returned a retryable temporary error after payment. the gateway kept the payment reserved in escrow and will retry status checks until the retry window expires.',
           order: retryingOrder ?? {
             ...baseOrder,
             status: 'processing' as const,
@@ -585,7 +585,7 @@ async function handlePrepaidAsyncProviderCall({
         {
           headers: {
             ...settlement.headers,
-            'X-Paykubo-Receipt-Id': receiptId
+            'X-App-Receipt-Id': receiptId
           }
         }
       )
@@ -629,10 +629,10 @@ async function handlePrepaidAsyncProviderCall({
         ...reservationResponse,
         error: adapterResult.errorMessage ?? 'Provider request failed.',
         message: refundedEscrow
-          ? 'The provider failed after x402 settlement, so Paykubo refunded the escrowed payment to the buyer.'
+          ? 'The provider failed after x402 settlement, so the gateway refunded the escrowed payment to the buyer.'
           : escrowContext
             ? `The provider failed after x402 settlement, but the escrow refund transaction did not complete. ${refundError}`
-            : 'The provider failed after direct x402 settlement. This order is refundable in Paykubo records, but the payment was already sent to the payTo wallet.',
+            : 'The provider failed after direct x402 settlement. This order is refundable in the gateway records, but the payment was already sent to the payTo wallet.',
         order: failedOrder ?? {
           ...baseOrder,
           status: 'failed',
@@ -664,7 +664,7 @@ async function handlePrepaidAsyncProviderCall({
       {
         headers: {
           ...settlement.headers,
-          'X-Paykubo-Receipt-Id': receiptId
+          'X-App-Receipt-Id': receiptId
         }
       }
     )
@@ -696,7 +696,7 @@ async function handlePrepaidAsyncProviderCall({
       ? {
           status: 'ready',
           message:
-            'Final usage exceeded the prepaid quote. Pay the delta before Paykubo reveals the provider result.',
+            'Final usage exceeded the prepaid quote. Pay the delta before the gateway reveals the provider result.',
           externalJobId: adapterResult.externalJobId
         }
       : adapterResult.responsePayload
@@ -798,7 +798,7 @@ async function handlePrepaidAsyncProviderCall({
   return NextResponse.json(finalBody, {
     headers: {
       ...settlement.headers,
-      'X-Paykubo-Receipt-Id': receiptId
+      'X-App-Receipt-Id': receiptId
     }
   })
 }
@@ -852,9 +852,9 @@ async function settlePayment({
   context,
   responseBody
 }: {
-  server: Awaited<ReturnType<typeof getPaykuboX402Server>>
+  server: Awaited<ReturnType<typeof getPaymentX402Server>>
   processResult: VerifiedPaymentResult
-  context: PaykuboRequestContext
+  context: PaymentRequestContext
   responseBody: unknown
 }) {
   let settlementErrorMessage = ''
@@ -992,7 +992,7 @@ function buildReservationResponse({
     data: {
       status: 'paid',
       message:
-        'The x402 payment settled before Paykubo started the credit-metered provider job.'
+        'The x402 payment settled before the gateway started the credit-metered provider job.'
     }
   }
 }
@@ -1020,7 +1020,7 @@ function createProviderIdempotencyKey({
   orderId: string
   requestId: string
 }) {
-  return `paykubo_${orderId}_${requestId}`
+  return `app_${orderId}_${requestId}`
 }
 
 async function reservePrepaidEscrow({

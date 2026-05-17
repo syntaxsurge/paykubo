@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title ApiPaymentEscrow
-/// @notice Holds prepaid ERC20 API payments until Paykubo can release or refund them.
+/// @notice Holds prepaid ERC20 API payments until the gateway can release or refund them.
 contract ApiPaymentEscrow is AccessControl {
   using SafeERC20 for IERC20;
 

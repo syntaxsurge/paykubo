@@ -281,7 +281,7 @@ function OrderStatusContent({
       return
     }
 
-    const saved = window.sessionStorage.getItem(`paykubo:order:${orderId}`)
+    const saved = window.sessionStorage.getItem(`app:order:${orderId}`)
 
     if (saved) {
       setOrder(JSON.parse(saved) as MarketplaceOrder)
@@ -319,7 +319,7 @@ function OrderStatusContent({
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      'X-Paykubo-Order-Id': order.id
+      'X-App-Order-Id': order.id
     }
 
     try {
@@ -443,7 +443,7 @@ function OrderStatusContent({
 
     setIsPaying(true)
     setWalletSteps(createWalletSteps('requirement'))
-    setStatus('Reading the x402 payment requirement from Paykubo.')
+    setStatus('Reading the x402 payment requirement from the gateway.')
     setPaymentError('')
     setPaymentRequirements(null)
 
@@ -466,7 +466,7 @@ function OrderStatusContent({
       if (initialRequirement) {
         updateWalletStep('requirement', {
           status: 'complete',
-          detail: 'Paykubo returned a payable x402 requirement.'
+          detail: 'the gateway returned a payable x402 requirement.'
         })
         setPaymentRequirements({
           status: initialRequirement.status,
@@ -516,7 +516,7 @@ function OrderStatusContent({
               headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
-                'X-Paykubo-Order-Id': order.id
+                'X-App-Order-Id': order.id
               },
               body: order.requestPayloadJson ?? '{}'
             }
@@ -638,7 +638,7 @@ function OrderStatusContent({
         status: 'complete',
         detail: settlementTxHash
           ? 'USDC settled on the configured network.'
-          : 'USDC settled and Paykubo received the paid response.',
+          : 'USDC settled and the gateway received the paid response.',
         txHash: isHexTransactionHash(settlementTxHash)
           ? settlementTxHash
           : undefined
@@ -676,7 +676,7 @@ function OrderStatusContent({
         detail: providerFailed
           ? 'Provider failed after payment settlement. Review refund and provider response details below.'
           : providerRetrying
-            ? 'Provider returned a temporary error. Payment remains reserved in escrow while Paykubo retries.'
+            ? 'Provider returned a temporary error. Payment remains reserved in escrow while the gateway retries.'
             : 'Provider response and receipt were saved.'
       })
 
@@ -690,7 +690,7 @@ function OrderStatusContent({
       setStatus(
         providerRetrying
           ? body.message ||
-              'Payment settled, and Paykubo is holding escrow while retrying the provider.'
+              'Payment settled, and the gateway is holding escrow while retrying the provider.'
           : providerFailed
             ? body.message ||
               body.error ||
@@ -782,7 +782,7 @@ function OrderStatusContent({
         body.order.status === 'completed'
           ? 'Provider job completed. The API response is ready.'
           : body.order.resultReleaseStatus === 'provider_retrying'
-            ? 'Provider returned a temporary error. Escrow is still reserved and Paykubo will retry.'
+            ? 'Provider returned a temporary error. Escrow is still reserved and the gateway will retry.'
             : `Provider job is ${orderStatusLabels[body.order.status].toLowerCase()}.`
       )
     } catch (caughtError) {
@@ -1475,7 +1475,7 @@ function ProviderResponsePanel({
         <div className='border-primary/30 bg-primary/10 rounded-lg border p-4'>
           <p className='font-semibold'>Temporary provider outage</p>
           <p className='text-foreground/70 mt-1 text-sm leading-6'>
-            Paykubo kept the payment reserved in escrow instead of refunding
+            the gateway kept the payment reserved in escrow instead of refunding
             immediately. Polling will retry until{' '}
             {order.providerRetry?.retryUntil
               ? new Date(order.providerRetry.retryUntil).toLocaleString()
@@ -2163,7 +2163,7 @@ async function requestPaymentRequirement(order: MarketplaceOrder) {
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      'X-Paykubo-Order-Id': order.id
+      'X-App-Order-Id': order.id
     },
     body: order.requestPayloadJson ?? '{}'
   })
@@ -2187,7 +2187,7 @@ async function requestPaymentRequirement(order: MarketplaceOrder) {
   const paymentRequired = decodePaymentRequiredHeader(response)
 
   if (!paymentRequired) {
-    throw new Error('Paykubo did not return a readable x402 requirement.')
+    throw new Error('the gateway did not return a readable x402 requirement.')
   }
 
   return {
@@ -2225,7 +2225,7 @@ async function requestClaimPaymentRequirement(order: MarketplaceOrder) {
 
   if (!paymentRequired) {
     throw new Error(
-      'Paykubo did not return a readable x402 delta payment requirement.'
+      'the gateway did not return a readable x402 delta payment requirement.'
     )
   }
 
@@ -2320,7 +2320,7 @@ async function ensurePermit2Allowance(
   }
 
   onStatus(
-    'Approve the one-time USDC Permit2 allowance in your wallet, then Paykubo will continue the paid API run.'
+    'Approve the one-time USDC Permit2 allowance in your wallet, then the gateway will continue the paid API run.'
   )
 
   const approvalTransaction = createPermit2ApprovalTx(tokenAddress)

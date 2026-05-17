@@ -96,7 +96,7 @@ const providerBenefits = [
   {
     icon: KeyRound,
     title: 'Keep keys private',
-    detail: 'Paykubo forwards securely server-side.'
+    detail: 'the gateway forwards securely server-side.'
   },
   {
     icon: ShieldCheck,
@@ -126,7 +126,7 @@ export default async function MarketingPage({
       <section className='container-page relative isolate py-16 sm:py-20 lg:py-24'>
         <div className='pointer-events-none absolute inset-y-8 right-0 -z-10 hidden w-1/2 items-center justify-center lg:flex'>
           <Image
-            src='/images/paykubo-logo.png'
+            src='/images/app-logo.png'
             alt=''
             width={520}
             height={520}
@@ -145,8 +145,9 @@ export default async function MarketingPage({
               Paid APIs for humans, apps, and autonomous agents.
             </h1>
             <p className='text-lead max-w-2xl'>
-              Paykubo lets providers sell API calls, developers buy them with
-              x402, and OpenAI agents spend from funded budgets with receipts.
+              The gateway lets providers sell API calls, developers buy them
+              with x402, and OpenAI agents spend from funded budgets with
+              receipts.
             </p>
           </div>
           <div className='flex flex-wrap gap-3'>
@@ -212,7 +213,7 @@ export default async function MarketingPage({
               From goal to audited result in four steps.
             </h2>
             <p className='text-muted-foreground max-w-lg text-sm leading-6'>
-              The agent chooses, Paykubo pays, providers work, and the proof
+              The agent chooses, the gateway pays, providers work, and the proof
               page records what happened.
             </p>
           </div>

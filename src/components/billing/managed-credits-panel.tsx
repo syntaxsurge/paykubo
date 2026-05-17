@@ -153,8 +153,8 @@ function ManagedCreditsPanelContent({
           <h2 className='font-display mt-2 text-2xl'>API-key path for teams</h2>
           <p className='text-foreground/65 mt-2 max-w-2xl text-sm leading-6'>
             x402 remains the native payment path. Managed credits let a team top
-            up USDC once, receive a Paykubo API key, and debit usage from the
-            saved balance before provider work starts.
+            up USDC once, receive a managed-credit API key, and debit usage from
+            the saved balance before provider work starts.
           </p>
         </div>
         <Button onClick={createAccount} disabled={isLoading || !address}>

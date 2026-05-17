@@ -15,6 +15,7 @@ import {
   toPaymentAssetAmount,
   x402Network
 } from '@/lib/config/chains'
+import { siteConfig } from '@/lib/config/site'
 import { getApiPaymentPayTo } from '@/lib/contracts/api-payment-escrow'
 import { envServer } from '@/lib/env/env.server'
 import { HmacFacilitatorClient } from '@/lib/x402/hmac-facilitator-client'
@@ -59,7 +60,7 @@ async function canPriceProductFromContext(
     return false
   }
 
-  const orderId = context.adapter.getHeader?.('x-paykubo-order-id')
+  const orderId = context.adapter.getHeader?.('x-app-order-id')
   const order = orderId ? await getMarketplaceOrderById(orderId) : undefined
 
   if (!order || order.productSlug !== product.slug) {
@@ -94,8 +95,7 @@ const paidCallRoute: RouteConfig = {
     },
     maxTimeoutSeconds: x402MaxTimeoutSeconds
   },
-  description:
-    'Payment-token-settled Paykubo API call through the x402 protocol.',
+  description: 'Payment-token-settled API call through the x402 protocol.',
   mimeType: 'application/json',
   unpaidResponseBody: async context => {
     const product = await requireProductFromContext(context)
@@ -170,7 +170,7 @@ const claimRoute: RouteConfig = {
     maxTimeoutSeconds: x402MaxTimeoutSeconds
   },
   description:
-    'USDC-settled Paykubo result claim for credit-metered API usage that exceeded the prepaid quote.',
+    'USDC-settled Result claim for credit-metered API usage that exceeded the prepaid quote.',
   mimeType: 'application/json',
   unpaidResponseBody: async context => {
     const order = await requireClaimOrderFromContext(context)
@@ -224,7 +224,7 @@ function getRequestPayload(context: HTTPRequestContext) {
   return context.adapter.getBody?.() ?? context.adapter.getQueryParams?.() ?? {}
 }
 
-export async function getPaykuboX402Server() {
+export async function getPaymentX402Server() {
   if (!serverPromise) {
     serverPromise = (async () => {
       const facilitator = new HmacFacilitatorClient({
@@ -259,9 +259,9 @@ function parseUsdcAmount(value: string | undefined) {
   return Number.isFinite(amount) ? amount : 0
 }
 
-export function getPaykuboPaywallConfig(currentUrl: string) {
+export function getPaymentPaywallConfig(currentUrl: string) {
   return {
-    appName: 'Paykubo',
+    appName: siteConfig.name,
     currentUrl,
     testnet: true
   }

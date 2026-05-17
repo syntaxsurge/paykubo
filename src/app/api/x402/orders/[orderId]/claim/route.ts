@@ -23,9 +23,9 @@ import { x402Network } from '@/lib/config/chains'
 import { releaseEscrowPayment } from '@/lib/contracts/api-payment-escrow'
 import { NextRequestAdapter } from '@/lib/x402/next-request-adapter'
 import {
-  getPaykuboPaywallConfig,
-  getPaykuboX402Server
-} from '@/lib/x402/paykubo-resource-server'
+  getPaymentPaywallConfig,
+  getPaymentX402Server
+} from '@/lib/x402/payment-resource-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,10 +72,10 @@ export async function POST(request: NextRequest, { params }: ClaimRouteProps) {
     paymentHeader:
       adapter.getHeader('payment-signature') ?? adapter.getHeader('x-payment')
   }
-  const server = await getPaykuboX402Server()
+  const server = await getPaymentX402Server()
   const processResult = await server.processHTTPRequest(
     context,
-    getPaykuboPaywallConfig(request.url)
+    getPaymentPaywallConfig(request.url)
   )
 
   if (processResult.type === 'payment-error') {
@@ -212,7 +212,7 @@ export async function POST(request: NextRequest, { params }: ClaimRouteProps) {
     {
       headers: {
         ...settlement.headers,
-        'X-Paykubo-Receipt-Id': receiptId
+        'X-App-Receipt-Id': receiptId
       }
     }
   )
@@ -236,7 +236,7 @@ async function settleClaim({
   context,
   responseBody
 }: {
-  server: Awaited<ReturnType<typeof getPaykuboX402Server>>
+  server: Awaited<ReturnType<typeof getPaymentX402Server>>
   processResult: VerifiedPaymentResult
   context: {
     adapter: NextRequestAdapter

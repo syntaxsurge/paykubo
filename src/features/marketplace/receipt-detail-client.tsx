@@ -24,7 +24,7 @@ export function ReceiptDetailClient({
       return
     }
 
-    const saved = window.sessionStorage.getItem(`paykubo:receipt:${receiptId}`)
+    const saved = window.sessionStorage.getItem(`app:receipt:${receiptId}`)
 
     if (saved) {
       setReceipt(JSON.parse(saved) as MarketplaceReceipt)

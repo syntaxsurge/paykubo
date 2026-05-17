@@ -35,7 +35,7 @@ const flowSteps = [
     icon: Bot,
     title: 'Agent plans work',
     detail:
-      'A buyer gives an objective, budget cap, and tool policy. Paykubo selects agent-ready APIs that fit the task.'
+      'A buyer gives an objective, budget cap, and tool policy. the gateway selects agent-ready APIs that fit the task.'
   },
   {
     icon: CircleDollarSign,
@@ -53,7 +53,7 @@ const flowSteps = [
     icon: ReceiptText,
     title: 'Provider gets paid',
     detail:
-      'Paykubo forwards the request, records the receipt, and exposes proof-ready transaction metadata.'
+      'the gateway forwards the request, records the receipt, and exposes proof-ready transaction metadata.'
   }
 ]
 
@@ -97,7 +97,7 @@ export default function HackathonDemoPage() {
           </Badge>
           <div className='space-y-5'>
             <h1 className='font-display text-4xl leading-tight font-semibold text-balance sm:text-5xl lg:text-6xl'>
-              Paykubo is the money layer for agent-ready APIs on Morph.
+              the gateway is the money layer for agent-ready APIs on Morph.
             </h1>
             <p className='text-lead max-w-2xl'>
               This public demo shows the x402 Agentic Payments use case without
@@ -184,8 +184,8 @@ export default function HackathonDemoPage() {
                 Simulated receipt preview
               </Badge>
               <h2 className='font-display mt-4 text-3xl font-semibold text-balance'>
-                Agent run paid an API, provider returned a result, and Paykubo
-                recorded proof metadata.
+                Agent run paid an API, provider returned a result, and the
+                gateway recorded proof metadata.
               </h2>
               <p className='text-muted-foreground mt-3 max-w-2xl text-sm leading-6'>
                 In the live flow, the same data comes from the x402 settlement

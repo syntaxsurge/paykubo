@@ -4,9 +4,9 @@ USDC-native API commerce for humans, applications, and AI agents on configurable
 EVM rails.
 
 Paykubo is a paid API marketplace and gateway. Providers list paid endpoints,
-buyers and agents pay per request using the configured payment token, and Paykubo handles
-discovery, x402 payment flow, request forwarding, receipts, usage records, and
-provider dashboards.
+buyers and agents pay per request using the configured payment token, and
+Paykubo handles discovery, x402 payment flow, request forwarding, receipts,
+usage records, and provider dashboards.
 
 ## Highlights
 
@@ -16,8 +16,9 @@ provider dashboards.
 - Marketplace catalog with USDC prices, provider badges, x402 flags, and
   agent-ready API details.
 - Autonomous Launch Pack Agent runs with an OpenAI planner and synthesizer that
-  choose paid tools, buy selected APIs, return deliverables, and publish on-chain
-  proof pages. A deterministic planner is available when no OpenAI key is set.
+  choose paid tools, buy selected APIs, return deliverables, and publish
+  on-chain proof pages. A deterministic planner is available when no OpenAI key
+  is set.
 - Provider dashboard with API call, revenue, success-rate, and fee-split
   metrics.
 - Provider product management for listing APIs, validating schemas, reviewing
@@ -27,8 +28,8 @@ provider dashboards.
   settlement, provider results, and receipt links.
 - Managed credits for teams that prefer API-key usage after recording USDC
   top-ups.
-- x402-protected product call route for settlement through the
-  configured facilitator.
+- x402-protected product call route for settlement through the configured
+  facilitator.
 - Public proof pages for autonomous runs with receipt rollups, proof hashes, and
   explorer links.
 - Generic external HTTP adapter for provider-created APIs, including private
@@ -154,10 +155,9 @@ Key values:
 4. Attest the completed run and open `/proofs/[proofId]`.
 5. For OpenAI-planned agent runs, set `AGENT_LLM_API_KEY` and optionally
    `AGENT_LLM_MODEL`; otherwise the run is labeled as deterministic fallback.
-6. For x402 settlement, fund the agent run vault from the browser wallet and
-   set `NEXT_PUBLIC_APP_URL` to the deployed app URL. The agent spender signs
-   payments and only needs native gas for Permit2 or refund-return
-   transactions.
+6. For x402 settlement, fund the agent run vault from the browser wallet and set
+   `NEXT_PUBLIC_APP_URL` to the deployed app URL. The agent spender signs
+   payments and only needs native gas for Permit2 or refund-return transactions.
 
 ## Core Commands
 

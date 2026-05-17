@@ -30,7 +30,7 @@ export function AgentRunList({ runs: initialRuns }: { runs: AgentRun[] }) {
         throw new Error(body?.error ?? 'Unable to delete this agent run.')
       }
 
-      window.sessionStorage.removeItem(`paykubo:agent-run:${runId}`)
+      window.sessionStorage.removeItem(`app:agent-run:${runId}`)
       setRuns(current => current.filter(run => run.id !== runId))
     } catch (caughtError) {
       setError(

@@ -132,7 +132,7 @@ export default async function AdminOrdersPage({
         totalRows={table.totalRows}
         totalPages={table.totalPages}
         searchPlaceholder='Search orders, request IDs, products, providers, wallets, statuses, or agent runs'
-        emptyTitle='No Paykubo gateway orders yet'
+        emptyTitle='No gateway orders yet'
         emptyDescription='Buyer, API-key, and autonomous agent orders appear here.'
         enableSelection
         bulkActions={[

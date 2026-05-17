@@ -26,11 +26,11 @@ export const orderStatusDetails: Record<OrderStatus, string> = {
   payment_required:
     'The payable request is ready. Run it with the connected wallet or execute the same endpoint from an x402 buyer client, backend, CLI, or autonomous agent.',
   quoted:
-    'Paykubo priced the request before any expensive provider work starts.',
+    'the gateway priced the request before any expensive provider work starts.',
   paid: 'Payment metadata has been accepted for this request.',
-  forwarding: 'Paykubo is forwarding the paid request to the provider.',
+  forwarding: 'the gateway is forwarding the paid request to the provider.',
   processing:
-    'The provider accepted the request and is processing the result, or Paykubo is holding escrow while retrying a temporary provider outage.',
+    'The provider accepted the request and is processing the result, or the gateway is holding escrow while retrying a temporary provider outage.',
   ready:
     'The provider finished processing. The result can be released to the buyer.',
   delta_payment_required:

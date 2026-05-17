@@ -1,5 +1,5 @@
-export const WALLET_SESSION_COOKIE = 'paykubo_wallet_session'
-export const WALLET_ADDRESS_COOKIE = 'paykubo_wallet_address'
+export const WALLET_SESSION_COOKIE = 'app_wallet_session'
+export const WALLET_ADDRESS_COOKIE = 'app_wallet_address'
 export const WALLET_SESSION_COOKIE_VALUE = 'connected'
 export const WALLET_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
 

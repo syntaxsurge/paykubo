@@ -9,11 +9,11 @@ export async function POST(request: Request) {
   const requestUrl = new URL(request.url)
   const payloadJson = parseJsonPayload(payloadText)
   const source =
-    request.headers.get('x-paykubo-webhook-source') ??
+    request.headers.get('x-app-webhook-source') ??
     requestUrl.searchParams.get('source') ??
     'external'
   const eventType =
-    request.headers.get('x-paykubo-event-type') ??
+    request.headers.get('x-app-event-type') ??
     request.headers.get('x-event-type') ??
     requestUrl.searchParams.get('event') ??
     'event.received'

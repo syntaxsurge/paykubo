@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-const selectionUpdatedEvent = 'paykubo:table-selection-updated'
+const selectionUpdatedEvent = 'app:table-selection-updated'
 
 export function ServerDataTableMasterCheckbox({
   tableId

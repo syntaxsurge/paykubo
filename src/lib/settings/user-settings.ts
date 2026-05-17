@@ -47,7 +47,7 @@ export function writeUserSettings(
   )
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('paykubo:user-settings-updated'))
+    window.dispatchEvent(new Event('app:user-settings-updated'))
   }
 }
 
@@ -55,7 +55,7 @@ export function clearUserSettings(walletAddress?: string | null) {
   userSettingsCache.delete(cacheKey(walletAddress))
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('paykubo:user-settings-updated'))
+    window.dispatchEvent(new Event('app:user-settings-updated'))
   }
 }
 

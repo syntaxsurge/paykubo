@@ -1,10 +1,10 @@
 import { envClient } from '@/lib/env/env.client'
 
-const productionAppUrl = 'https://paykubo.vercel.app'
+const productionAppUrl = 'https://platform.vercel.app'
 const localHostnames = new Set(['localhost', '127.0.0.1', '::1'])
 
 export const siteConfig = {
-  name: envClient.NEXT_PUBLIC_APP_NAME ?? 'Paykubo',
+  name: envClient.NEXT_PUBLIC_APP_NAME ?? 'App',
   description:
     envClient.NEXT_PUBLIC_APP_DESCRIPTION ??
     'USDC-native API commerce for humans, applications, and AI agents.',

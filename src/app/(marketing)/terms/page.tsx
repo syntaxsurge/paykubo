@@ -3,8 +3,8 @@ import { Card } from '@/components/ui/card'
 
 const sections = [
   {
-    title: 'Use of Paykubo',
-    body: 'Paykubo provides USDC-native API marketplace, provider dashboard, wallet, admin, and receipt surfaces for paid API commerce.'
+    title: 'Use of the app',
+    body: 'The app provides USDC-native API marketplace, provider dashboard, wallet, admin, and receipt surfaces for paid API commerce.'
   },
   {
     title: 'Billing terms',

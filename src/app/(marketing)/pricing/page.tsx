@@ -27,7 +27,7 @@ const splitSteps = [
   },
   {
     icon: ReceiptText,
-    title: 'Paykubo records the receipt',
+    title: 'the gateway records the receipt',
     description:
       'Successful paid calls store the amount, provider plan, platform fee, provider amount, and transaction link.'
   },
@@ -58,7 +58,7 @@ const faqs = [
   {
     question: 'How are provider payouts calculated?',
     answer:
-      'Paykubo reads the provider plan, applies the tier fee split to successful receipts, and shows provider amount plus platform fee in the ledger.'
+      'the gateway reads the provider plan, applies the tier fee split to successful receipts, and shows provider amount plus platform fee in the ledger.'
   }
 ]
 
@@ -199,9 +199,9 @@ export default function PricingPage() {
               Simple receipt math for every successful call.
             </h2>
             <p className='text-muted-foreground mt-3 text-sm leading-6'>
-              The buyer sees one listed USDC price. Paykubo records the provider
-              plan on the receipt, then calculates platform fee and provider
-              amount from that plan.
+              The buyer sees one listed USDC price. the gateway records the
+              provider plan on the receipt, then calculates platform fee and
+              provider amount from that plan.
             </p>
           </div>
 
@@ -229,7 +229,7 @@ export default function PricingPage() {
             Billing, payouts, and agent calls.
           </h2>
           <p className='text-muted-foreground text-sm leading-6'>
-            Paykubo only records revenue on successful paid API calls.
+            the gateway only records revenue on successful paid API calls.
             Everything else stays out of provider earnings.
           </p>
         </div>

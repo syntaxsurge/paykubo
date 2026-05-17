@@ -42,12 +42,12 @@ type AgentGlobalStore = {
 }
 
 const globalStore = globalThis as typeof globalThis & {
-  __paykuboAgentStore?: AgentGlobalStore
+  __appAgentStore?: AgentGlobalStore
 }
 
 const store =
-  globalStore.__paykuboAgentStore ??
-  (globalStore.__paykuboAgentStore = {
+  globalStore.__appAgentStore ??
+  (globalStore.__appAgentStore = {
     runs: new Map<string, AgentRun>(),
     proofs: new Map<string, AgentProof>(),
     cancelledRuns: new Set<string>()
@@ -488,7 +488,7 @@ export async function confirmAgentRunFunding({
       })
     ],
     summary:
-      'The agent budget is funded. OpenAI can now select tools and Paykubo can pay x402 calls inside this budget.',
+      'The agent budget is funded. OpenAI can now select tools and the gateway can pay x402 calls inside this budget.',
     updatedAt: new Date().toISOString()
   } satisfies AgentRun
 

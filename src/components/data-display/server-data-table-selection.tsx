@@ -288,7 +288,7 @@ function removeRowsFromDom(ids: string[]) {
 
 function removeAgentRunSessionStorage(ids: string[]) {
   ids.forEach(id => {
-    window.sessionStorage.removeItem(`paykubo:agent-run:${id}`)
+    window.sessionStorage.removeItem(`app:agent-run:${id}`)
   })
 }
 

@@ -321,7 +321,7 @@ async function executeAgentAction(
           ? [
               describeAsyncOrderFailure(paidResult.order),
               refundError
-                ? `The x402 payment was refunded to the signer, but Paykubo could not return it to the agent vault: ${refundError}`
+                ? `The x402 payment was refunded to the signer, but the gateway could not return it to the agent vault: ${refundError}`
                 : undefined
             ]
               .filter(Boolean)
@@ -359,7 +359,7 @@ async function executeAgentAction(
           ? caughtError.message
           : 'The paid x402 request failed.',
         refundError
-          ? `Paykubo advanced this action from the vault, but could not return the unused signer funds: ${refundError}`
+          ? `the gateway advanced this action from the vault, but could not return the unused signer funds: ${refundError}`
           : undefined
       ]
         .filter(Boolean)
@@ -375,11 +375,11 @@ function describeAgentActionProgress(action: AgentAction) {
   }
 
   if (action.status === 'quoted') {
-    return `${action.productName} was quoted at ${action.amountUsdc}; Paykubo is advancing vault funds.`
+    return `${action.productName} was quoted at ${action.amountUsdc}; the gateway is advancing vault funds.`
   }
 
   if (action.status === 'paid') {
-    return `${action.productName} is paid and running. Async tools stay in this state while Paykubo polls the provider result.`
+    return `${action.productName} is paid and running. Async tools stay in this state while the gateway polls the provider result.`
   }
 
   if (action.status === 'completed') {
@@ -445,7 +445,7 @@ async function advanceAgentVaultSpend({
 
   if (!result) {
     throw new Error(
-      'AgentRunVault spend could not be advanced. Set NEXT_PUBLIC_AGENT_RUN_VAULT_ADDRESS and AGENT_RUN_VAULT_OPERATOR_PRIVATE_KEY so Paykubo can transfer the funded run budget to the agent signer before x402 settlement.'
+      'AgentRunVault spend could not be advanced. Set NEXT_PUBLIC_AGENT_RUN_VAULT_ADDRESS and AGENT_RUN_VAULT_OPERATOR_PRIVATE_KEY so the gateway can transfer the funded run budget to the agent signer before x402 settlement.'
     )
   }
 
@@ -539,7 +539,7 @@ async function callPaidProductWithAgentWallet(
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        'x-paykubo-agent-run-id': runId
+        'x-app-agent-run-id': runId
       },
       body: JSON.stringify(action.requestPayload)
     }
@@ -1353,7 +1353,7 @@ async function synthesizeWithOpenAi(
             {
               type: 'input_text',
               text: [
-                'You are Paykubo Launch Pack Agent synthesizer.',
+                'You are Launch Pack Agent synthesizer.',
                 'Use the completed paid tool outputs, receipts, skipped tools, and objective to produce the final launch-pack deliverables.',
                 'Do not invent receipts, transactions, or provider results.',
                 'Only include videoResultUrl when a completed media action returned a final result, project, render, preview, clone, or output URL. Do not use queued or processing job IDs as final media output.',
@@ -1399,7 +1399,7 @@ async function synthesizeWithOpenAi(
       text: {
         format: {
           type: 'json_schema',
-          name: 'paykubo_agent_synthesis',
+          name: 'app_agent_synthesis',
           strict: true,
           schema: {
             type: 'object',

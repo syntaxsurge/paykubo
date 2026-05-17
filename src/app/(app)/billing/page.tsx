@@ -204,8 +204,8 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
             <h2 className='font-display mt-2 text-2xl'>Saved credit access</h2>
             <p className='text-foreground/65 mt-2 text-sm leading-6'>
               API keys are for teams that prefer prepaid usage instead of
-              signing every request. Paykubo reserves credits before provider
-              work starts and records receipts when usage settles.
+              signing every request. the gateway reserves credits before
+              provider work starts and records receipts when usage settles.
             </p>
           </div>
           <div className='border-foreground/10 bg-muted/40 rounded-lg border p-4 text-sm'>

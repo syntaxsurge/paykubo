@@ -106,7 +106,7 @@ contract SubscriptionManager is AccessControl {
    *      If the team is already active, the new period is appended to the current
    *      expiry; otherwise it starts from `block.timestamp`.
    *
-   * @param team     Wallet that owns the Paykubo workspace (can differ from `msg.sender`).
+   * @param team     Wallet that owns the app workspace (can differ from `msg.sender`).
    * @param planKey  Pricing tier identifier (1 = Base, 2 = Plus).
    */
   function paySubscription(address team, uint8 planKey) external payable {

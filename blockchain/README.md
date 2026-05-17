@@ -1,12 +1,12 @@
 # Blockchain Workspace
 
-This workspace keeps Paykubo contracts isolated from the Next.js runtime while
+This workspace keeps app contracts isolated from the Next.js runtime while
 providing deployment shortcuts.
 
 ## Structure
 
 - `blockchain/contracts/SubscriptionManager.sol` - the on-chain subscription
-  contract supported by Paykubo.
+  contract supported by the app.
 - `blockchain/contracts/AgentRunAttestor.sol` - the proof hash attestor
   for autonomous agent runs.
 - `blockchain/contracts/ApiPaymentEscrow.sol` - escrow for prepaid

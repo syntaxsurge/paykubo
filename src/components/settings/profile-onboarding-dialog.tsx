@@ -168,7 +168,7 @@ function ProfileOnboardingFields({
                 id='profile-onboarding-description'
                 className='text-muted-foreground mt-2 text-sm leading-6'
               >
-                Paykubo shows creator profiles beside marketplace APIs, provider
+                the app shows creator profiles beside marketplace APIs, provider
                 earnings, receipts, and agent activity. Complete this once to
                 continue.
               </p>
@@ -196,7 +196,7 @@ function ProfileOnboardingFields({
               <Input
                 value={settings.fullName}
                 onChange={event => updateField('fullName', event.target.value)}
-                placeholder='Paykubo Labs'
+                placeholder='Provider Labs'
                 required
                 minLength={2}
               />
@@ -218,7 +218,7 @@ function ProfileOnboardingFields({
                       normalizeUsername(event.target.value)
                     )
                   }
-                  placeholder='paykubo'
+                  placeholder='platform'
                   className='pl-9'
                   required
                   minLength={3}
@@ -239,7 +239,7 @@ function ProfileOnboardingFields({
                   type='email'
                   value={settings.email}
                   onChange={event => updateField('email', event.target.value)}
-                  placeholder='team@paykubo.com'
+                  placeholder='team@example.com'
                   className='pl-9'
                   required
                 />

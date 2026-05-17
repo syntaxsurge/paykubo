@@ -299,7 +299,7 @@ function getLaunchChecklist(product: ApiProduct) {
       label: 'Endpoint is configured',
       ready: Boolean(product.providerEndpointUrl),
       detail: product.providerEndpointUrl
-        ? 'Paykubo can forward paid requests to the provider endpoint.'
+        ? 'the gateway can forward paid requests to the provider endpoint.'
         : 'Add the provider endpoint before publishing.'
     },
     {
