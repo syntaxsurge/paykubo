@@ -629,8 +629,12 @@ Before creating a new helper or service file:
   provider failure refunds the x402 payment back to the signer, Paykubo returns
   the USDC to the vault and records `recordSpendRefund`; unrecovered settlement
   or refund failures stay counted as spent and remain visible in diagnostics.
-  Paid action failures preserve the response body, settlement guidance, and
-  provider details in action diagnostics. Async provider actions use the same
+  Running executions persist planner and per-action progress as tools move from
+  quoted to paid to terminal states, and the run detail client auto-polls
+  `GET /api/agents/runs/[runId]` while the run is executing or attesting so
+  users can watch async progress without a manual refresh. Paid action failures
+  preserve the response body, settlement guidance, and provider details in
+  action diagnostics. Async provider actions use the same
   `/api/orders/[orderId]/provider-status` polling path as marketplace orders;
   queued and processing media jobs remain incomplete until the provider returns
   a terminal result, refund state, or completed project URL. Agent-paid x402
@@ -764,8 +768,9 @@ Before creating a new helper or service file:
   x402 facilitator, show payment failures as dedicated alert cards with copyable
   error text, keep long explanations inside collapsible details, separate direct
   API responses from async provider jobs, automatically poll provider status
-  when an order has an external job ID or a retryable provider outage, keep
-  escrow reserved for retryable provider failures such as temporary 5xx,
+  through the shared `useAutoPolling` hook when an order has an external job ID
+  or a retryable provider outage, keep escrow reserved for retryable provider
+  failures such as temporary 5xx,
   Cloudflare, timeout, rate-limit, or provider-marked retryable responses until
   the 24-hour retry window expires, complete async orders when a provider
   returns a completed status or cloneable handoff URL, keep manual polling

@@ -231,10 +231,25 @@ export async function executeStoredAgentRun(runId: string, appUrl?: string) {
     args: [getAgentRunBytes32(run.id)]
   }).catch(() => null)
 
+  let latestRun = running
   const result = await executeAgentRunActions(
     running,
     () => isAgentRunCancelled(run.id),
-    appUrl
+    appUrl,
+    async progress => {
+      if (isAgentRunCancelled(run.id)) {
+        return
+      }
+
+      latestRun = {
+        ...latestRun,
+        actions: progress.actions,
+        summary: progress.summary ?? latestRun.summary,
+        updatedAt: new Date().toISOString()
+      } satisfies AgentRun
+      runs.set(run.id, latestRun)
+      await persistAgentRun(latestRun)
+    }
   )
 
   if (isAgentRunCancelled(run.id)) {
@@ -243,7 +258,7 @@ export async function executeStoredAgentRun(runId: string, appUrl?: string) {
 
   const ledgerResult = await buildSpendLedger(running, result.actions)
   const nextRun = {
-    ...running,
+    ...latestRun,
     status: result.status,
     actions: result.actions,
     deliverables: result.deliverables,

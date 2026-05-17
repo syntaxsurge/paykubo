@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   AlertTriangle,
@@ -15,6 +15,7 @@ import {
   type LucideIcon,
   Play,
   ReceiptText,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Undo2,
@@ -33,6 +34,7 @@ import {
   agentRunStatusLabels
 } from '@/features/agents/status'
 import type { AgentLedgerEvent, AgentRun } from '@/features/agents/types'
+import { useAutoPolling } from '@/hooks/use-auto-polling'
 import { defaultAppChain } from '@/lib/config/chains'
 import {
   agentRunVaultAbi,
@@ -84,6 +86,11 @@ const publicClient = createPublicClient({
   chain: defaultAppChain.viemChain,
   transport: http(defaultAppChain.viemChain.rpcUrls.default.http[0])
 })
+const AGENT_RUN_POLL_INTERVAL_MS = 4000
+const agentRunPollingStatuses = new Set<AgentRun['status']>([
+  'running',
+  'attesting'
+])
 
 export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
   const { address } = useAccount()
@@ -94,6 +101,8 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [isRefunding, setIsRefunding] = useState(false)
   const [isAttesting, setIsAttesting] = useState(false)
+  const [isRefreshingRun, setIsRefreshingRun] = useState(false)
+  const refreshInFlightRef = useRef(false)
 
   useEffect(() => {
     if (run) {
@@ -114,6 +123,60 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
       ).length ?? 0,
     [run?.actions]
   )
+  const shouldPollRun =
+    Boolean(run) &&
+    (isRunning ||
+      isAttesting ||
+      agentRunPollingStatuses.has(run?.status ?? 'planned'))
+
+  useAutoPolling({
+    enabled: shouldPollRun,
+    intervalMs: AGENT_RUN_POLL_INTERVAL_MS,
+    onPoll: refreshRun
+  })
+
+  async function refreshRun() {
+    if (refreshInFlightRef.current) {
+      return
+    }
+
+    refreshInFlightRef.current = true
+    setIsRefreshingRun(true)
+
+    try {
+      const response = await fetch(`/api/agents/runs/${runId}`, {
+        headers: {
+          Accept: 'application/json'
+        }
+      })
+      const body = (await response.json()) as AgentRun & { error?: string }
+
+      if (!response.ok) {
+        throw new Error(body.error ?? 'Unable to refresh the agent run.')
+      }
+
+      persistRun(body)
+
+      if (['completed', 'failed', 'attested'].includes(body.status)) {
+        setStatus(
+          body.status === 'completed'
+            ? 'Agent run completed paid actions and prepared deliverables.'
+            : body.status === 'attested'
+              ? 'Proof hash attested on Morph and ready for public audit.'
+              : body.summary
+        )
+      }
+    } catch (caughtError) {
+      setStatus(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Unable to refresh the agent run.'
+      )
+    } finally {
+      refreshInFlightRef.current = false
+      setIsRefreshingRun(false)
+    }
+  }
 
   async function fundRun() {
     if (!walletClient?.account) {
@@ -344,6 +407,7 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
           isRunning={isRunning}
           isRefunding={isRefunding}
           isAttesting={isAttesting}
+          isRefreshingRun={isRefreshingRun}
           canRun={canRun}
           canRefund={canRefund}
           onFund={fundRun}
@@ -463,6 +527,7 @@ function RunControlPanel({
   isRunning,
   isRefunding,
   isAttesting,
+  isRefreshingRun,
   canRun,
   canRefund,
   onFund,
@@ -477,6 +542,7 @@ function RunControlPanel({
   isRunning: boolean
   isRefunding: boolean
   isAttesting: boolean
+  isRefreshingRun: boolean
   canRun: boolean
   canRefund: boolean
   onFund: () => void
@@ -569,6 +635,15 @@ function RunControlPanel({
             role='status'
           >
             {status}
+          </p>
+        ) : null}
+        {isRefreshingRun ? (
+          <p className='text-foreground/60 flex items-center gap-2 text-sm'>
+            <RefreshCw
+              className='text-primary h-4 w-4 animate-spin'
+              aria-hidden
+            />
+            Refreshing agent progress
           </p>
         ) : null}
 

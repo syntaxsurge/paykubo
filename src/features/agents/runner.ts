@@ -46,10 +46,22 @@ import { envServer } from '@/lib/env/env.server'
 const asyncProviderPollIntervalMs = 5_000
 const asyncProviderPollAttempts = 72
 
+type AgentRunProgress = {
+  actions: AgentAction[]
+  summary?: string
+}
+
+type AgentRunProgressHandler = (
+  progress: AgentRunProgress
+) => Promise<void> | void
+
+type AgentActionProgressHandler = (action: AgentAction) => Promise<void> | void
+
 export async function executeAgentRunActions(
   run: AgentRun,
   shouldStop: () => boolean = () => false,
-  appUrl = envClient.NEXT_PUBLIC_APP_URL
+  appUrl = envClient.NEXT_PUBLIC_APP_URL,
+  onProgress?: AgentRunProgressHandler
 ) {
   const plan =
     run.actions.length > 0
@@ -60,20 +72,47 @@ export async function executeAgentRunActions(
       : await buildAgentPlan(run)
   const actions = plan.actions
   const completedActions: AgentAction[] = []
+  let progressActions = actions
   let spendUsd = 0
+  const publishProgress = async (summary?: string) => {
+    await onProgress?.({
+      actions: progressActions,
+      summary
+    })
+  }
+  const publishActionProgress = async (nextAction: AgentAction) => {
+    progressActions = progressActions.map(action =>
+      action.id === nextAction.id ? nextAction : action
+    )
+    await publishProgress(describeAgentActionProgress(nextAction))
+  }
+
+  await publishProgress(
+    `The agent planned ${actions.length} paid action${
+      actions.length === 1 ? '' : 's'
+    } and is preparing x402 settlement.`
+  )
 
   for (const action of actions) {
     if (shouldStop()) {
-      completedActions.push({
+      const stoppedAction = {
         ...action,
         status: 'failed',
         errorMessage: 'The agent run was stopped before this action executed.',
         completedAt: new Date().toISOString()
-      })
+      } satisfies AgentAction
+      completedActions.push(stoppedAction)
+      await publishActionProgress(stoppedAction)
       break
     }
 
-    const result = await executeAgentAction(run, action, spendUsd, appUrl)
+    const result = await executeAgentAction(
+      run,
+      action,
+      spendUsd,
+      appUrl,
+      publishActionProgress
+    )
 
     if (result.vaultAdvancedAmountUsdc && !result.vaultRefundedAmountUsdc) {
       spendUsd = Number(
@@ -86,6 +125,7 @@ export async function executeAgentRunActions(
     }
 
     completedActions.push(result)
+    await publishActionProgress(result)
 
     if (shouldStop()) {
       break
@@ -118,7 +158,8 @@ async function executeAgentAction(
   run: AgentRun,
   action: AgentAction,
   currentSpendUsd: number,
-  appUrl?: string
+  appUrl?: string,
+  onProgress?: AgentActionProgressHandler
 ) {
   const product = await getProductBySlug(action.productSlug)
 
@@ -169,6 +210,7 @@ async function executeAgentAction(
     requestPayload,
     startedAt: action.startedAt ?? new Date().toISOString()
   } satisfies AgentAction
+  await onProgress?.(started)
 
   if (!envServer.AGENT_SPENDER_PRIVATE_KEY || !appUrl) {
     return {
@@ -183,12 +225,16 @@ async function executeAgentAction(
   let advanced: AgentAction | null = null
 
   try {
-    advanced = await advanceAgentVaultSpend({
-      runId: run.id,
-      action: started,
-      amountUsd: quotedPrice.amountUsd,
-      amountLabel: quotedPrice.amountLabel
-    })
+    advanced = {
+      ...(await advanceAgentVaultSpend({
+        runId: run.id,
+        action: started,
+        amountUsd: quotedPrice.amountUsd,
+        amountLabel: quotedPrice.amountLabel
+      })),
+      status: 'paid'
+    } satisfies AgentAction
+    await onProgress?.(advanced)
     await ensureAgentCanPayWithPermit2(quotedPrice.amountUsd)
     const paidResult = await callPaidProductWithAgentWallet(
       run.id,
@@ -283,6 +329,35 @@ async function executeAgentAction(
       completedAt: new Date().toISOString()
     } satisfies AgentAction
   }
+}
+
+function describeAgentActionProgress(action: AgentAction) {
+  if (action.status === 'planned') {
+    return `${action.productName} is queued.`
+  }
+
+  if (action.status === 'quoted') {
+    return `${action.productName} was quoted at ${action.amountUsdc}; Paykubo is advancing vault funds.`
+  }
+
+  if (action.status === 'paid') {
+    return `${action.productName} is paid and running. Async tools stay in this state while Paykubo polls the provider result.`
+  }
+
+  if (action.status === 'completed') {
+    return `${action.productName} completed and returned a receipt-backed result.`
+  }
+
+  if (action.status === 'skipped') {
+    return `${action.productName} was skipped: ${
+      action.errorMessage ??
+      'the action could not run inside the selected budget.'
+    }`
+  }
+
+  return `${action.productName} failed: ${
+    action.errorMessage ?? 'the paid action did not complete.'
+  }`
 }
 
 function parseUsdcLabel(value: string) {
