@@ -241,10 +241,21 @@ async function executeAgentAction(
     } satisfies AgentAction
     await onProgress?.(advanced)
     await ensureAgentCanPayWithPermit2(quotedPrice.amountUsd)
+    let paidProgress = advanced
     const paidResult = await callPaidProductWithAgentWallet(
       run.id,
       advanced,
-      appUrl
+      appUrl,
+      async progress => {
+        paidProgress = {
+          ...paidProgress,
+          responsePayload: buildPaidProductResponsePayload(progress),
+          receipt: progress.receipt,
+          orderId: progress.order?.id,
+          requestId: progress.order?.requestId
+        } satisfies AgentAction
+        await onProgress?.(paidProgress)
+      }
     )
 
     const resultStatus =
@@ -276,10 +287,10 @@ async function executeAgentAction(
       refundedAdvance && !('error' in refundedAdvance) ? refundedAdvance : {}
 
     return {
-      ...advanced,
+      ...paidProgress,
       ...refundFields,
       status: resultStatus,
-      responsePayload: paidResult.data,
+      responsePayload: buildPaidProductResponsePayload(paidResult),
       receipt: paidResult.receipt,
       orderId: paidResult.order?.id,
       requestId: paidResult.order?.requestId,
@@ -462,7 +473,8 @@ async function refundAgentVaultAdvance({
 async function callPaidProductWithAgentWallet(
   runId: string,
   action: AgentAction,
-  appUrl: string
+  appUrl: string,
+  onProgress?: (result: PaidProductCallResponse) => Promise<void> | void
 ) {
   const privateKey = envServer.AGENT_SPENDER_PRIVATE_KEY
 
@@ -497,9 +509,12 @@ async function callPaidProductWithAgentWallet(
     throw new Error(describePaidCallFailure(response, body, paymentResult))
   }
 
+  await onProgress?.(body as PaidProductCallResponse)
+
   return await waitForPaidProductCompletion({
     appUrl,
-    initial: body as PaidProductCallResponse
+    initial: body as PaidProductCallResponse,
+    onProgress
   })
 }
 
@@ -529,10 +544,12 @@ type ProviderStatusResponse = {
 
 async function waitForPaidProductCompletion({
   appUrl,
-  initial
+  initial,
+  onProgress
 }: {
   appUrl: string
   initial: PaidProductCallResponse
+  onProgress?: (result: PaidProductCallResponse) => Promise<void> | void
 }) {
   const order = initial.order
 
@@ -571,6 +588,7 @@ async function waitForPaidProductCompletion({
       },
       body.order
     )
+    await onProgress?.(next)
 
     if (!shouldPollPaidOrder(body.order)) {
       return next
@@ -584,6 +602,30 @@ async function waitForPaidProductCompletion({
     ]
       .filter(Boolean)
       .join(' ')
+  )
+}
+
+function buildPaidProductResponsePayload(result: PaidProductCallResponse) {
+  const payload: Record<string, unknown> = {
+    data: result.data,
+    order: result.order,
+    receipt: result.receipt,
+    pricing: result.pricing,
+    provider: result.provider,
+    x402: result.x402,
+    escrow: result.escrow
+  }
+  const resultUrl =
+    extractResultUrl(result.data) ??
+    extractResultUrl(result.order?.responsePayload) ??
+    result.order?.resultUrl
+
+  if (resultUrl) {
+    payload.resultUrl = resultUrl
+  }
+
+  return Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== undefined)
   )
 }
 

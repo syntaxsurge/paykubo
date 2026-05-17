@@ -1265,8 +1265,11 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
           value={
             action.responsePayload ?? {
               status: action.status,
-              errorMessage:
-                action.errorMessage ?? 'No response payload recorded yet.'
+              message:
+                action.errorMessage ??
+                (action.status === 'paid'
+                  ? 'The paid request is running. Paykubo is waiting for the provider response.'
+                  : 'No response payload recorded yet.')
             }
           }
           defaultOpen={false}

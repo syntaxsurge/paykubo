@@ -656,20 +656,24 @@ Before creating a new helper or service file:
   verification and settlement. Vault spend and refund writes wait for successful
   transaction receipts, and refund recovery reads the vault's live spent amount
   before calling `recordSpendRefund` so retries and partially recovered failures
-  do not request a larger refund than the current vault state can accept. When
-  `AGENT_LLM_API_KEY` is configured, the agent uses the OpenAI Responses API
-  with `AGENT_LLM_MODEL` or `gpt-5.2` to select tools, generate request
-  payloads, skip unrelated tools, reserve one affordable media tool when the
-  objective or template requires video output, set a budget strategy, and
-  synthesize the final launch pack from completed paid responses and receipts.
-  When no paid action completes in production, the run remains failed and
-  presents diagnostics instead of treating generated copy as verified output.
-  When the key is absent, the deterministic fallback ranks the allowed
-  marketplace tools from the objective and source context while preserving
-  required media-tool selection for video workflows. Both planner modes record
-  the prompt, model or fallback label, rationale, skipped tools, selected tools,
-  funding ledger, and synthesis metadata in run deliverables, action cards, and
-  proof payloads.
+  do not request a larger refund than the current vault state can accept. Direct
+  run reads fall back to Convex by run ID when a server runtime has a stale
+  in-memory run cache. Agent action progress records the settled x402
+  order/receipt and the provider's initial response as soon as the paid request
+  is accepted, then keeps async media actions in `paid` state while polling for
+  the terminal provider output. When `AGENT_LLM_API_KEY` is configured, the
+  agent uses the OpenAI Responses API with `AGENT_LLM_MODEL` or `gpt-5.2` to
+  select tools, generate request payloads, skip unrelated tools, reserve one
+  affordable media tool when the objective or template requires video output,
+  set a budget strategy, and synthesize the final launch pack from completed
+  paid responses and receipts. When no paid action completes in production, the
+  run remains failed and presents diagnostics instead of treating generated copy
+  as verified output. When the key is absent, the deterministic fallback ranks
+  the allowed marketplace tools from the objective and source context while
+  preserving required media-tool selection for video workflows. Both planner
+  modes record the prompt, model or fallback label, rationale, skipped tools,
+  selected tools, funding ledger, and synthesis metadata in run deliverables,
+  action cards, and proof payloads.
 - `/agents` is a tabbed command center that opens on recent runs and also
   exposes a templates tab. Both tabs use separate server-fed tables with search,
   sorting, and pagination; recent runs support current-page row selection and
