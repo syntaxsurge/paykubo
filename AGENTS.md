@@ -567,7 +567,10 @@ Before creating a new helper or service file:
   marketplace, provider, receipt, and agent surfaces. Creator profile settings
   persist through `/api/settings/profile` into the Convex `users` table and
   hydrate client displays through `src/hooks/use-user-settings.ts`; browser
-  localStorage is not used for profile persistence.
+  localStorage is not used for profile persistence. The profile page also reads
+  the connected wallet's configured payment-token balance on the configured EVM
+  chain through `src/hooks/use-payment-token-balance.ts`, so the displayed
+  balance follows the active settlement token and network environment.
 - The app favicon is generated from the app logo and lives only at
   `src/app/favicon.ico`; public image branding lives at
   `public/images/app-logo.png`. The web app manifest is generated from
