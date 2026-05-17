@@ -17,6 +17,8 @@ Use this checklist before operating the app.
 - `NEXT_PUBLIC_MORPH_HOODI_EXPLORER_URL=https://explorer-hoodi.morph.network`
 - `NEXT_PUBLIC_X402_NETWORK=eip155:2910`
 - `X402_FACILITATOR_URL=https://morph-rails-hoodi.morph.network/x402/v2`
+- `MORPH_X402_ACCESS_KEY` for Morph x402 `/verify` and `/settle` HMAC auth
+- `MORPH_X402_SECRET_KEY` for Morph x402 `/verify` and `/settle` HMAC signing
 - `AGENT_SPENDER_PRIVATE_KEY`
 - `AGENT_ATTESTER_PRIVATE_KEY`
 - `NEXT_PUBLIC_AGENT_ATTESTOR_ADDRESS`
