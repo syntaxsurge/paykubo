@@ -1,0 +1,20 @@
+packages:
+  - .
+
+allowBuilds:
+  '@tailwindcss/oxide': true
+  bufferutil: true
+  esbuild: true
+  keccak: true
+  sharp: true
+  unrs-resolver: true
+  utf-8-validate: true
+
+onlyBuiltDependencies:
+  - '@tailwindcss/oxide'
+  - bufferutil
+  - esbuild
+  - keccak
+  - sharp
+  - unrs-resolver
+  - utf-8-validate
