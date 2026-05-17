@@ -142,6 +142,7 @@ function AgentRunContent({
   const [isAttesting, setIsAttesting] = useState(false)
   const [isRefreshingRun, setIsRefreshingRun] = useState(false)
   const refreshInFlightRef = useRef(false)
+  const autoResumeInFlightRef = useRef(false)
 
   useEffect(() => {
     if (run) {
@@ -174,6 +175,23 @@ function AgentRunContent({
     intervalMs: AGENT_RUN_POLL_INTERVAL_MS,
     onPoll: refreshRun
   })
+
+  useEffect(() => {
+    if (
+      !run ||
+      isRunning ||
+      autoResumeInFlightRef.current ||
+      !shouldResumePlannedActions(run)
+    ) {
+      return
+    }
+
+    autoResumeInFlightRef.current = true
+    setStatus('Async tool completed. Continuing the remaining planned actions.')
+    void executeRun().finally(() => {
+      autoResumeInFlightRef.current = false
+    })
+  }, [isRunning, run])
 
   async function refreshRun() {
     if (refreshInFlightRef.current) {
@@ -1323,6 +1341,30 @@ function shouldPollAsyncActionOnClient(action: AgentRun['actions'][number]) {
   const poll = getLatestAsyncPoll(action)
 
   return !['completed', 'failed', 'expired'].includes(poll?.orderStatus ?? '')
+}
+
+function shouldResumePlannedActions(run: AgentRun) {
+  if (!['running', 'failed'].includes(run.status)) {
+    return false
+  }
+
+  if (
+    !['funded', 'partially_spent', 'refund_available'].includes(
+      run.fundingStatus
+    )
+  ) {
+    return false
+  }
+
+  const hasCompletedAction = run.actions.some(
+    action => action.status === 'completed'
+  )
+  const hasPlannedAction = run.actions.some(action =>
+    ['planned', 'quoted'].includes(action.status)
+  )
+  const hasActivePaidAction = run.actions.some(shouldPollAsyncActionOnClient)
+
+  return hasCompletedAction && hasPlannedAction && !hasActivePaidAction
 }
 
 function ActionLinks({ action }: { action: AgentRun['actions'][number] }) {

@@ -4,6 +4,7 @@ import {
   deleteAgentRun,
   syncAgentRunAsyncProviderStatus
 } from '@/features/agents/store'
+import { getPublicAppOrigin } from '@/lib/config/site'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,7 @@ type AgentRunRouteProps = {
 export async function GET(request: Request, { params }: AgentRunRouteProps) {
   const run = await syncAgentRunAsyncProviderStatus(
     (await params).runId,
-    new URL(request.url).origin
+    getAppOrigin(request)
   )
 
   if (!run) {
@@ -27,6 +28,10 @@ export async function GET(request: Request, { params }: AgentRunRouteProps) {
   }
 
   return NextResponse.json(run)
+}
+
+function getAppOrigin(request: Request) {
+  return getPublicAppOrigin(request.url)
 }
 
 export async function DELETE(

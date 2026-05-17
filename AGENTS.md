@@ -673,14 +673,16 @@ Before creating a new helper or service file:
   new backend poll replaces the prior visible snapshot instead of growing an
   unbounded history. The run page refreshes running, attesting, and active paid
   async runs every eight seconds, reconciles stale paid actions through the
-  provider-status endpoint, renders the latest async poll as a compact
-  live-status disclosure without poll-number timeline rows, and keeps compact
-  request/response JSON inside expandable diagnostics. Receipt, settlement, and
-  vault transaction links render as icon actions on each tool card, while public
-  provider result links render as compact host/path previews instead of
-  full-width raw URLs. Agent and marketplace snapshots persisted to Convex keep
-  result URLs, job IDs, statuses, pricing, and escrow metadata, but compact
-  provider response bodies before saving.
+  provider-status endpoint using the configured public app origin, auto-resumes
+  remaining planned tools after an async action reaches a terminal state,
+  renders the latest async poll as a compact live-status disclosure without
+  poll-number timeline rows, and keeps compact request/response JSON inside
+  expandable diagnostics. Receipt, settlement, and vault transaction links
+  render as icon actions on each tool card, while public provider result links
+  render as compact host/path previews instead of full-width raw URLs. Agent and
+  marketplace snapshots persisted to Convex keep result URLs, job IDs, statuses,
+  pricing, and escrow metadata, but compact provider response bodies before
+  saving.
   When `AGENT_LLM_API_KEY` is
   configured, the agent uses the OpenAI Responses API with `AGENT_LLM_MODEL` or
   `gpt-5.2` to select tools, generate request payloads, skip unrelated tools,

@@ -99,10 +99,11 @@ export async function syncAgentRunAsyncProviderStatus(
     return null
   }
 
-  const syncableAction = run.actions.find(shouldSyncAsyncAction)
+  const canonicalRun = await canonicalizeAgentPollingUrls(run, appUrl)
+  const syncableAction = canonicalRun.actions.find(shouldSyncAsyncAction)
 
   if (!syncableAction?.orderId) {
-    return run
+    return canonicalRun
   }
 
   const pollingUrl = `${appUrl}/api/orders/${encodeURIComponent(syncableAction.orderId)}/provider-status`
@@ -117,7 +118,7 @@ export async function syncAgentRunAsyncProviderStatus(
   }).catch(() => null)
 
   if (!response) {
-    return run
+    return canonicalRun
   }
 
   const body = (await response
@@ -125,7 +126,7 @@ export async function syncAgentRunAsyncProviderStatus(
     .catch(() => null)) as ProviderStatusResponse | null
 
   if (!body?.order) {
-    return run
+    return canonicalRun
   }
 
   const poll = buildStoredAsyncPollingResponse({
@@ -151,8 +152,8 @@ export async function syncAgentRunAsyncProviderStatus(
         : syncableAction.completedAt
   } satisfies AgentRun['actions'][number]
   const nextRun = {
-    ...run,
-    actions: run.actions.map(action =>
+    ...canonicalRun,
+    actions: canonicalRun.actions.map(action =>
       action.id === nextAction.id ? nextAction : action
     ),
     updatedAt: new Date().toISOString()
@@ -908,6 +909,87 @@ function shouldSyncAsyncAction(action: AgentRun['actions'][number]) {
     action.latestAsyncPollingResponse ?? action.asyncPollingResponses?.at(-1)
 
   return !isTerminalProviderStatus(latestPoll?.orderStatus)
+}
+
+async function canonicalizeAgentPollingUrls(run: AgentRun, appUrl: string) {
+  let changed = false
+  const actions: AgentRun['actions'] = run.actions.map(
+    (action): AgentRun['actions'][number] => {
+      const latestAsyncPollingResponse = action.latestAsyncPollingResponse
+        ? canonicalizePollingResponse(action.latestAsyncPollingResponse, appUrl)
+        : undefined
+      const asyncPollingResponses = action.asyncPollingResponses?.map(poll =>
+        canonicalizePollingResponse(poll, appUrl)
+      )
+
+      if (
+        latestAsyncPollingResponse !== action.latestAsyncPollingResponse ||
+        asyncPollingResponses?.some(
+          (poll, index) => poll !== action.asyncPollingResponses?.[index]
+        )
+      ) {
+        changed = true
+
+        return {
+          ...action,
+          latestAsyncPollingResponse,
+          asyncPollingResponses
+        }
+      }
+
+      return action
+    }
+  )
+
+  if (!changed) {
+    return run
+  }
+
+  const nextRun = {
+    ...run,
+    actions,
+    updatedAt: new Date().toISOString()
+  } satisfies AgentRun
+
+  runs.set(nextRun.id, nextRun)
+  await persistAgentRun(nextRun)
+
+  return nextRun
+}
+
+function canonicalizePollingResponse(
+  poll: AgentAsyncPollingResponse,
+  appUrl: string
+): AgentAsyncPollingResponse {
+  const pollingUrl = canonicalizeProviderStatusUrl(poll.pollingUrl, appUrl)
+  const requestUrl = canonicalizeProviderStatusUrl(poll.request.url, appUrl)
+
+  if (pollingUrl === poll.pollingUrl && requestUrl === poll.request.url) {
+    return poll
+  }
+
+  return {
+    ...poll,
+    pollingUrl,
+    request: {
+      ...poll.request,
+      url: requestUrl
+    }
+  }
+}
+
+function canonicalizeProviderStatusUrl(value: string, appUrl: string) {
+  try {
+    const url = new URL(value)
+
+    if (!/^\/api\/orders\/[^/]+\/provider-status$/.test(url.pathname)) {
+      return value
+    }
+
+    return new URL(`${url.pathname}${url.search}`, appUrl).toString()
+  } catch {
+    return value
+  }
 }
 
 function buildStoredAsyncPollingResponse({

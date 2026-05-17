@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { executeStoredAgentRun } from '@/features/agents/store'
+import { getPublicAppOrigin } from '@/lib/config/site'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,7 @@ export async function POST(
 ) {
   const run = await executeStoredAgentRun(
     (await params).runId,
-    new URL(request.url).origin
+    getAppOrigin(request)
   )
 
   if (!run) {
@@ -27,4 +28,8 @@ export async function POST(
   }
 
   return NextResponse.json(run)
+}
+
+function getAppOrigin(request: Request) {
+  return getPublicAppOrigin(request.url)
 }
