@@ -719,7 +719,8 @@ Before creating a new helper or service file:
   receipt links, per-tool request and response JSON, extracted tool output
   previews, Markdown-rendered deliverables, a final output section that renders
   detected text, image, video, and result-link deliverables at the bottom of the
-  run page, unused refund controls, and writes Morph proof attestations.
+  run page, unused refund controls with visible refund transaction explorer
+  links, and writes Morph proof attestations.
 - `/proofs/[proofId]` publicly displays non-sensitive autonomous run proof
   metadata, proof hash, receipt IDs, budget funding and refund metadata, total
   USDC spend, attestation transaction, and Morph explorer link.

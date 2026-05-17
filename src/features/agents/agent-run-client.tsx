@@ -48,7 +48,7 @@ import {
 } from '@/features/agents/status'
 import type { AgentLedgerEvent, AgentRun } from '@/features/agents/types'
 import { useAutoPolling } from '@/hooks/use-auto-polling'
-import { defaultAppChain } from '@/lib/config/chains'
+import { defaultAppChain, getExplorerTransactionUrl } from '@/lib/config/chains'
 import {
   agentRunVaultAbi,
   erc20ApprovalAbi
@@ -955,12 +955,17 @@ function RunControlPanel({
         </div>
 
         {status ? (
-          <p
-            className='border-border bg-muted/35 rounded-lg border p-3 text-sm leading-6 break-words'
-            role='status'
-          >
-            {status}
-          </p>
+          <div className='space-y-2'>
+            <p
+              className='border-border bg-muted/35 rounded-lg border p-3 text-sm leading-6 break-words'
+              role='status'
+            >
+              {status}
+            </p>
+            {isRefundStatusMessage(status) ? (
+              <RefundTransactionLinks run={run} />
+            ) : null}
+          </div>
         ) : null}
         {isRefreshingRun ? (
           <p className='text-foreground/60 flex items-center gap-2 text-sm'>
@@ -983,10 +988,115 @@ function RunControlPanel({
               {address ?? 'Not connected'}
             </span>
           </div>
+          {run.refundTxHash ? (
+            <a
+              href={
+                run.refundExplorerUrl ??
+                getExplorerTransactionUrl(run.refundTxHash) ??
+                undefined
+              }
+              target='_blank'
+              rel='noreferrer'
+              className='border-border/70 text-primary hover:bg-primary/10 mt-1 flex items-center justify-between gap-3 rounded-md border px-2.5 py-2 font-semibold transition'
+            >
+              <span>Refund tx</span>
+              <span className='flex min-w-0 items-center gap-2'>
+                <span className='max-w-32 truncate'>
+                  {shorten(run.refundTxHash)}
+                </span>
+                <ExternalLink className='h-3.5 w-3.5 shrink-0' aria-hidden />
+              </span>
+            </a>
+          ) : null}
         </div>
       </Card>
     </aside>
   )
+}
+
+function RefundTransactionLinks({ run }: { run: AgentRun }) {
+  const links = collectRefundLinks(run)
+
+  if (!links.length) {
+    return (
+      <p className='border-border/70 text-foreground/60 rounded-lg border border-dashed p-3 text-xs leading-5'>
+        Refund transaction is not recorded yet. Refresh after the wallet or
+        vault transaction confirms.
+      </p>
+    )
+  }
+
+  return (
+    <div className='grid gap-2'>
+      {links.map(link => (
+        <a
+          key={`${link.label}-${link.txHash}`}
+          href={
+            link.explorerUrl ??
+            getExplorerTransactionUrl(link.txHash) ??
+            undefined
+          }
+          target='_blank'
+          rel='noreferrer'
+          className='border-border bg-background/50 text-primary hover:bg-primary/10 flex items-center justify-between gap-3 rounded-lg border p-3 text-sm font-semibold transition'
+        >
+          <span>{link.label}</span>
+          <span className='flex min-w-0 items-center gap-2'>
+            <span className='max-w-40 truncate'>{shorten(link.txHash)}</span>
+            <ExternalLink className='h-4 w-4 shrink-0' aria-hidden />
+          </span>
+        </a>
+      ))}
+    </div>
+  )
+}
+
+function collectRefundLinks(run: AgentRun) {
+  const links: Array<{
+    label: string
+    txHash: string
+    explorerUrl?: string | null
+  }> = []
+  const seen = new Set<string>()
+  const addLink = (
+    label: string,
+    txHash: string | null | undefined,
+    explorerUrl?: string | null
+  ) => {
+    if (!txHash || seen.has(txHash)) {
+      return
+    }
+
+    seen.add(txHash)
+    links.push({ label, txHash, explorerUrl })
+  }
+
+  addLink('Unused budget refund', run.refundTxHash, run.refundExplorerUrl)
+
+  for (const event of run.ledgerEvents) {
+    if (event.type === 'unused_refunded' || event.type === 'spend_refunded') {
+      addLink(event.label, event.txHash, event.explorerUrl)
+    }
+  }
+
+  for (const action of run.actions) {
+    addLink(
+      `${action.productName} vault refund`,
+      action.vaultRefundTxHash,
+      action.vaultRefundExplorerUrl
+    )
+    addLink(
+      `${action.productName} signer return`,
+      action.vaultReturnTxHash,
+      action.vaultReturnExplorerUrl
+    )
+  }
+
+  return links
+}
+
+function isRefundStatusMessage(status: string) {
+  return /\brefund|refunded|refunding\b/i.test(status)
 }
 
 function ExecutionSection({ run }: { run: AgentRun }) {
