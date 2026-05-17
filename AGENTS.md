@@ -617,11 +617,16 @@ Before creating a new helper or service file:
   video-first launch campaigns that combine public data scans with async
   media-generation tools when budget allows. Agent runs require the owner to
   fund the `AgentRunVault` with USDC before the configured agent signer can
-  execute x402 paid actions. Before an agent spends, the runner verifies the
-  production agent signer's USDC balance, submits the required Permit2 approval
-  when the allowance is insufficient, waits until the allowance is readable, and
-  then executes the hosted x402 call from the same origin that triggered the
-  run. Paid action failures preserve the response body, settlement guidance, and
+  execute x402 paid actions. Before each paid action, Paykubo advances the
+  quoted USDC amount from the vault to the agent signer with `recordSpend`,
+  verifies the signer's balance, submits the required Permit2 approval when the
+  allowance is insufficient, waits until the allowance is readable, and then
+  executes the hosted x402 call from the same origin that triggered the run. If
+  a pre-settlement failure occurs after the vault advance, or if an escrowed
+  provider failure refunds the x402 payment back to the signer, Paykubo returns
+  the USDC to the vault and records `recordSpendRefund`; unrecovered settlement
+  or refund failures stay counted as spent and remain visible in diagnostics.
+  Paid action failures preserve the response body, settlement guidance, and
   provider details in action diagnostics. Async provider actions use the same
   `/api/orders/[orderId]/provider-status` polling path as marketplace orders;
   queued and processing media jobs remain incomplete until the provider returns
@@ -631,14 +636,16 @@ Before creating a new helper or service file:
   revenue ledger as browser and developer API calls. When `AGENT_LLM_API_KEY` is
   configured, the agent uses the OpenAI Responses API with `AGENT_LLM_MODEL` or
   `gpt-5.2` to select tools, generate request payloads, skip unrelated tools,
-  set a budget strategy, and synthesize the final launch pack from completed
-  paid responses and receipts. When no paid action completes in production, the
-  run remains failed and presents diagnostics instead of treating generated copy
-  as verified output. When the key is absent, the deterministic fallback ranks
-  the allowed marketplace tools from the objective and source context. Both
-  planner modes record the prompt, model or fallback label, rationale, skipped
-  tools, selected tools, funding ledger, and synthesis metadata in run
-  deliverables, action cards, and proof payloads.
+  reserve one affordable media tool when the objective or template requires
+  video output, set a budget strategy, and synthesize the final launch pack from
+  completed paid responses and receipts. When no paid action completes in
+  production, the run remains failed and presents diagnostics instead of
+  treating generated copy as verified output. When the key is absent, the
+  deterministic fallback ranks the allowed marketplace tools from the objective
+  and source context while preserving required media-tool selection for video
+  workflows. Both planner modes record the prompt, model or fallback label,
+  rationale, skipped tools, selected tools, funding ledger, and synthesis
+  metadata in run deliverables, action cards, and proof payloads.
 - `/agents` is a tabbed command center that opens on recent runs and also
   exposes a templates tab. Both tabs use separate server-fed tables with search,
   sorting, and pagination; recent runs support current-page row selection and

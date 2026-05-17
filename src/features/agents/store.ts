@@ -18,7 +18,6 @@ import {
   getAgentRunVaultAddress,
   getAgentRunVaultExplorerUrl,
   getAgentSignerAddress,
-  getAgentVaultPaymentId,
   getUsdcTokenAddress,
   parseUsdcToAtomic,
   writeAgentRunVault
@@ -495,28 +494,39 @@ async function buildSpendLedger(run: AgentRun, actions: AgentRun['actions']) {
   let spent = 0
 
   for (const action of actions) {
-    if (action.status !== 'completed' || !action.receipt) {
+    const advanced = parseUsdc(action.vaultAdvancedAmountUsdc)
+    const refunded = parseUsdc(action.vaultRefundedAmountUsdc)
+
+    if (advanced <= 0) {
       continue
     }
 
-    const amount = parseUsdc(action.amountUsdc)
-    const paymentId = getAgentVaultPaymentId(run.id, action.id)
-    const tx = await writeAgentRunVault({
-      functionName: 'recordSpend',
-      args: [getAgentRunBytes32(run.id), paymentId, parseUsdcToAtomic(amount)]
-    }).catch(() => null)
-
-    spent += amount
+    spent += Math.max(0, advanced - refunded)
     newEvents.push(
       buildLedgerEvent({
         type: 'spend_recorded',
-        label: `Agent spent budget on ${action.productName}.`,
-        amountUsdc: `${amount.toFixed(2)} USDC`,
-        txHash: tx?.txHash ?? action.receipt.txHash,
-        explorerUrl: tx?.explorerUrl ?? action.receipt.explorerUrl,
+        label: `Agent advanced vault budget to pay ${action.productName}.`,
+        amountUsdc: `${advanced.toFixed(2)} USDC`,
+        txHash: action.vaultSpendTxHash ?? action.receipt?.txHash,
+        explorerUrl:
+          action.vaultSpendExplorerUrl ?? action.receipt?.explorerUrl,
         actionId: action.id
       })
     )
+
+    if (refunded > 0) {
+      newEvents.push(
+        buildLedgerEvent({
+          type: 'spend_refunded',
+          label: `Unused agent signer funds were returned after ${action.productName}.`,
+          amountUsdc: `${refunded.toFixed(2)} USDC`,
+          txHash: action.vaultRefundTxHash ?? action.vaultReturnTxHash,
+          explorerUrl:
+            action.vaultRefundExplorerUrl ?? action.vaultReturnExplorerUrl,
+          actionId: action.id
+        })
+      )
+    }
   }
 
   const funded = parseUsdc(run.fundedAmountUsdc)
@@ -590,8 +600,8 @@ async function persistAgentProof(proof: AgentProof) {
   })
 }
 
-function parseUsdc(value: string) {
-  const amount = Number(value.replace(/[^0-9.]/g, ''))
+function parseUsdc(value: string | null | undefined) {
+  const amount = Number((value ?? '').replace(/[^0-9.]/g, ''))
 
   return Number.isFinite(amount) ? amount : 0
 }

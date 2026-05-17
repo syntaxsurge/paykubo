@@ -44,7 +44,7 @@ export function AuthRequiredToast({
       role='status'
       aria-live='polite'
       className={cn(
-        'fixed bottom-4 left-4 z-50 w-[calc(100vw-2rem)] max-w-md',
+        'fixed right-4 bottom-4 z-50 w-[calc(100vw-2rem)] max-w-md',
         'border-foreground/10 bg-card text-foreground rounded-lg border p-4 shadow-xl'
       )}
     >

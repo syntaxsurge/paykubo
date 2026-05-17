@@ -1,3 +1,4 @@
+import { getAgentTemplate } from '@/features/agents/templates'
 import type {
   AgentAction,
   AgentPlannerMode,
@@ -16,7 +17,8 @@ export const AGENT_PLANNER_PROMPT = [
   '2. Use async media generation only when the objective asks for launch assets, video, creative collateral, or a media deliverable.',
   '3. Skip tools that are unrelated to the objective even if they are allowed.',
   '4. Never exceed the max paid action count.',
-  '5. Every chosen tool must produce an auditable paid action and receipt when production signing is configured.'
+  '5. If the objective or template requires a video/media deliverable and an affordable agent-ready media tool is available, reserve one action slot for exactly one media tool.',
+  '6. Every chosen tool must produce an auditable paid action and receipt when production signing is configured.'
 ].join('\n')
 
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses'
@@ -77,7 +79,8 @@ const objectiveSignals = {
     'storyboard',
     'project',
     'render',
-    'creative'
+    'creative',
+    'media'
   ],
   market: [
     'market',
@@ -124,10 +127,13 @@ export async function buildDeterministicAgentPlan(
   run: AgentRun
 ): Promise<AgentPlanResult> {
   const now = new Date().toISOString()
-  const plannedTools = (await rankAllowedTools(run)).slice(
-    0,
-    run.maxPaidActions
-  )
+  const rankedTools = await rankAllowedTools(run)
+  const products = rankedTools.map(tool => tool.product)
+  const plannedTools = enforceMediaToolSelection({
+    run,
+    products,
+    plannedTools: rankedTools.slice(0, run.maxPaidActions)
+  })
   const actions = plannedTools.map(({ product, score, rationale }, index) => ({
     id: `act_${run.id.slice(4)}_${index + 1}`,
     runId: run.id,
@@ -319,7 +325,7 @@ function buildActionsFromOpenAiPlan({
   const bySlug = new Map(products.map(product => [product.slug, product]))
   const seen = new Set<string>()
 
-  return [...plan.selectedTools]
+  const actions = [...plan.selectedTools]
     .sort((a, b) => a.priority - b.priority)
     .slice(0, run.maxPaidActions)
     .reduce<AgentAction[]>((actions, tool, index) => {
@@ -350,6 +356,234 @@ function buildActionsFromOpenAiPlan({
 
       return actions
     }, [])
+
+  return enforceMediaActionSelection({
+    run,
+    products,
+    actions,
+    model
+  })
+}
+
+function enforceMediaToolSelection({
+  run,
+  products,
+  plannedTools
+}: {
+  run: AgentRun
+  products: ApiProduct[]
+  plannedTools: PlannedTool[]
+}) {
+  if (!requiresMediaDeliverable(run)) {
+    return fitPlannedToolsToBudget(run, plannedTools)
+  }
+
+  const selectedHasMedia = plannedTools.some(tool =>
+    isMediaProduct(tool.product)
+  )
+  const mediaTool = products
+    .filter(product => isMediaProduct(product))
+    .filter(product => product.priceUsd <= run.budgetCapUsdc)
+    .sort(compareMediaProducts)[0]
+
+  if (selectedHasMedia) {
+    return fitPlannedToolsToBudget(
+      run,
+      plannedTools,
+      new Set(
+        plannedTools
+          .filter(tool => isMediaProduct(tool.product))
+          .map(tool => tool.product.slug)
+      )
+    )
+  }
+
+  if (!mediaTool) {
+    return fitPlannedToolsToBudget(run, plannedTools)
+  }
+
+  const forcedMedia = {
+    product: mediaTool,
+    score: 100,
+    rationale:
+      'the template requires a completed video or media project handoff, so one media tool is reserved before synthesis'
+  } satisfies PlannedTool
+  const withoutDuplicate = plannedTools.filter(
+    tool => tool.product.slug !== mediaTool.slug
+  )
+  const next =
+    withoutDuplicate.length >= run.maxPaidActions
+      ? [
+          ...withoutDuplicate
+            .filter(tool => !isMediaProduct(tool.product))
+            .slice(0, Math.max(0, run.maxPaidActions - 1)),
+          forcedMedia
+        ]
+      : [...withoutDuplicate, forcedMedia]
+
+  return fitPlannedToolsToBudget(run, next, new Set([mediaTool.slug]))
+}
+
+function enforceMediaActionSelection({
+  run,
+  products,
+  actions,
+  model
+}: {
+  run: AgentRun
+  products: ApiProduct[]
+  actions: AgentAction[]
+  model: string
+}) {
+  if (!requiresMediaDeliverable(run)) {
+    return reindexActions(fitActionsToBudget(run, products, actions))
+  }
+
+  const selectedHasMedia = actions.some(action =>
+    isMediaProductSlug(products, action.productSlug)
+  )
+  const mediaProduct = products
+    .filter(product => isMediaProduct(product))
+    .filter(product => product.priceUsd <= run.budgetCapUsdc)
+    .sort(compareMediaProducts)[0]
+
+  if (selectedHasMedia) {
+    return reindexActions(
+      fitActionsToBudget(
+        run,
+        products,
+        actions,
+        new Set(
+          actions
+            .filter(action => isMediaProductSlug(products, action.productSlug))
+            .map(action => action.productSlug)
+        )
+      )
+    )
+  }
+
+  if (!mediaProduct) {
+    return reindexActions(fitActionsToBudget(run, products, actions))
+  }
+
+  const forcedMediaAction = buildForcedMediaAction(run, mediaProduct, model)
+  const withoutDuplicate = actions.filter(
+    action => action.productSlug !== mediaProduct.slug
+  )
+  const next =
+    withoutDuplicate.length >= run.maxPaidActions
+      ? [
+          ...withoutDuplicate
+            .filter(action => !isMediaProductSlug(products, action.productSlug))
+            .slice(0, Math.max(0, run.maxPaidActions - 1)),
+          forcedMediaAction
+        ]
+      : [...withoutDuplicate, forcedMediaAction]
+
+  return reindexActions(
+    fitActionsToBudget(run, products, next, new Set([mediaProduct.slug]))
+  )
+}
+
+function buildForcedMediaAction(
+  run: AgentRun,
+  product: ApiProduct,
+  model: string
+): AgentAction {
+  const now = new Date().toISOString()
+  const rationale =
+    'Reserved because this template requires a completed video/media project handoff.'
+
+  return {
+    id: `act_${run.id.slice(4)}_media`,
+    runId: run.id,
+    productSlug: product.slug,
+    productName: product.name,
+    providerName: product.providerName,
+    status: 'planned',
+    amountUsdc: product.priceLabel,
+    objective: `OpenAI ${model} reserved ${product.name}: ${rationale}`,
+    planningRationale: rationale,
+    plannerScore: 100,
+    requestPayload: buildPayloadForProduct(product, product.slug, run),
+    startedAt: now
+  }
+}
+
+function fitPlannedToolsToBudget(
+  run: AgentRun,
+  tools: PlannedTool[],
+  requiredSlugs = new Set<string>()
+) {
+  return removeOverBudgetItems(
+    tools.slice(0, run.maxPaidActions),
+    run.budgetCapUsdc,
+    requiredSlugs,
+    tool => tool.product.priceUsd,
+    tool => tool.product.slug,
+    tool => tool.score
+  )
+}
+
+function fitActionsToBudget(
+  run: AgentRun,
+  products: ApiProduct[],
+  actions: AgentAction[],
+  requiredSlugs = new Set<string>()
+) {
+  const productBySlug = new Map(
+    products.map(product => [product.slug, product])
+  )
+
+  return removeOverBudgetItems(
+    actions.slice(0, run.maxPaidActions),
+    run.budgetCapUsdc,
+    requiredSlugs,
+    action => productBySlug.get(action.productSlug)?.priceUsd ?? 0,
+    action => action.productSlug,
+    action => action.plannerScore ?? 0
+  )
+}
+
+function removeOverBudgetItems<T>(
+  items: T[],
+  budget: number,
+  requiredSlugs: Set<string>,
+  priceOf: (item: T) => number,
+  slugOf: (item: T) => string,
+  scoreOf: (item: T) => number
+) {
+  const next = [...items]
+
+  while (sumPrices(next, priceOf) > budget) {
+    const removable = next
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => !requiredSlugs.has(slugOf(item)))
+      .sort(
+        (a, b) =>
+          scoreOf(a.item) - scoreOf(b.item) || priceOf(b.item) - priceOf(a.item)
+      )[0]
+
+    if (!removable) {
+      break
+    }
+
+    next.splice(removable.index, 1)
+  }
+
+  return next
+}
+
+function sumPrices<T>(items: T[], priceOf: (item: T) => number) {
+  return items.reduce((sum, item) => sum + priceOf(item), 0)
+}
+
+function reindexActions(actions: AgentAction[]) {
+  return actions.map((action, index) => ({
+    ...action,
+    id: `act_${action.runId.slice(4)}_${index + 1}`,
+    plannerScore: action.plannerScore ?? Math.max(1, 100 - index)
+  }))
 }
 
 function buildOpenAiPlannerPrompt() {
@@ -360,17 +594,40 @@ function buildOpenAiPlannerPrompt() {
     'Choose only from the provided tool slugs. Do not invent tools.',
     'Generate each requestPayloadJson as a valid JSON object string suitable for the selected tool request schema.',
     'Prefer useful public data tools before expensive or async media tools unless the objective clearly needs a media deliverable.',
+    'When requiresMediaDeliverable is true and eligibleMediaTools is not empty, select exactly one eligible media tool and reserve enough budget for it before selecting research tools.',
+    'For video launch campaigns, the media tool is required because the final output must include a completed project, render, preview, clone, or output URL.',
     'If a tool is irrelevant, skip it and explain why.',
     'The platform will quote and pay the selected tools after your plan, so your plan must respect the budget and max action count.'
   ].join('\n')
 }
 
 function buildOpenAiPlannerContext(run: AgentRun, products: ApiProduct[]) {
+  const template = getAgentTemplate(run.template)
+  const requiresMedia = requiresMediaDeliverable(run)
+  const eligibleMediaTools = products
+    .filter(product => isMediaProduct(product))
+    .filter(product => product.priceUsd <= run.budgetCapUsdc)
+    .sort(compareMediaProducts)
+
   return {
+    templateTitle: template?.title ?? run.title,
+    templateDeliverables: template?.deliverables ?? [],
+    templateToolStrategy: template?.toolStrategy ?? '',
     objective: run.objective,
     sourceText: run.sourceText ?? '',
     budgetCapUsdc: run.budgetCapUsdc,
     maxPaidActions: run.maxPaidActions,
+    requiresMediaDeliverable: requiresMedia,
+    mediaToolPolicy: requiresMedia
+      ? 'Select exactly one eligible media/video tool if available and affordable, then use remaining action slots for research.'
+      : 'Select a media tool only when it directly improves the objective.',
+    eligibleMediaTools: eligibleMediaTools.map(product => ({
+      slug: product.slug,
+      name: product.name,
+      priceUsd: product.priceUsd,
+      executionMode: product.executionMode,
+      resultDelivery: product.resultDelivery
+    })),
     availableTools: products.map(product => ({
       slug: product.slug,
       name: product.name,
@@ -488,6 +745,83 @@ function buildDeterministicSkippedTools(
           'The fallback planner ranked other allowed tools higher for this objective.'
       }
     })
+}
+
+function requiresMediaDeliverable(run: AgentRun) {
+  const template = getAgentTemplate(run.template)
+  const text = normalizeText(
+    [
+      run.template,
+      run.title,
+      run.objective,
+      run.sourceText,
+      template?.title,
+      template?.summary,
+      template?.objective,
+      template?.sourceText,
+      template?.toolStrategy,
+      ...(template?.deliverables ?? [])
+    ]
+      .filter(Boolean)
+      .join(' ')
+  )
+
+  return hasSignal(text, [
+    ...objectiveSignals.media,
+    'cliplore',
+    'media output',
+    'project handoff',
+    'video generation',
+    'video first',
+    'output link'
+  ])
+}
+
+function isMediaProductSlug(products: ApiProduct[], slug: string) {
+  const product = products.find(candidate => candidate.slug === slug)
+
+  return product ? isMediaProduct(product) : false
+}
+
+function isMediaProduct(product: ApiProduct) {
+  const text = normalizeText(
+    `${product.slug} ${product.name} ${product.description} ${product.providerName}`
+  )
+
+  return (
+    product.category === 'media' ||
+    product.executionMode === 'asynchronous' ||
+    product.resultDelivery !== 'direct_response' ||
+    hasSignal(text, [
+      'cliplore',
+      'video',
+      'media',
+      'render',
+      'project',
+      'clip',
+      'movie',
+      'output'
+    ])
+  )
+}
+
+function compareMediaProducts(a: ApiProduct, b: ApiProduct) {
+  return mediaProductScore(b) - mediaProductScore(a) || a.priceUsd - b.priceUsd
+}
+
+function mediaProductScore(product: ApiProduct) {
+  const text = normalizeText(
+    `${product.slug} ${product.name} ${product.description} ${product.providerName}`
+  )
+
+  return [
+    text.includes('cliplore') ? 40 : 0,
+    product.category === 'media' ? 25 : 0,
+    text.includes('video') ? 20 : 0,
+    product.executionMode === 'asynchronous' ? 10 : 0,
+    product.resultDelivery !== 'direct_response' ? 8 : 0,
+    text.includes('render') || text.includes('project') ? 6 : 0
+  ].reduce((sum, value) => sum + value, 0)
 }
 
 function defaultExpectedDeliverables() {

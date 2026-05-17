@@ -70,6 +70,15 @@ export type AgentAction = {
   receipt?: MarketplaceReceipt
   orderId?: string
   requestId?: string
+  vaultPaymentId?: string
+  vaultAdvancedAmountUsdc?: string
+  vaultSpendTxHash?: string | null
+  vaultSpendExplorerUrl?: string | null
+  vaultRefundedAmountUsdc?: string
+  vaultRefundTxHash?: string | null
+  vaultRefundExplorerUrl?: string | null
+  vaultReturnTxHash?: string | null
+  vaultReturnExplorerUrl?: string | null
   errorMessage?: string
   startedAt?: string
   completedAt?: string

@@ -26,9 +26,20 @@ import {
 import type { AgentAction, AgentRun } from '@/features/agents/types'
 import { resolveProductPrice } from '@/features/marketplace/pricing'
 import { getProductBySlug } from '@/features/marketplace/products'
-import type { MarketplaceReceipt } from '@/features/marketplace/receipts'
+import {
+  buildExplorerUrl,
+  type MarketplaceReceipt
+} from '@/features/marketplace/receipts'
 import type { MarketplaceOrder } from '@/features/marketplace/types'
 import { defaultAppChain, morphUsdcTokenAddress } from '@/lib/config/chains'
+import {
+  getAgentRunBytes32,
+  getAgentRunVaultAddress,
+  getAgentVaultPaymentId,
+  parseUsdcToAtomic,
+  type AgentVaultWriteResult,
+  writeAgentRunVault
+} from '@/lib/contracts/agent-run-vault'
 import { envClient } from '@/lib/env/env.client'
 import { envServer } from '@/lib/env/env.server'
 
@@ -64,7 +75,11 @@ export async function executeAgentRunActions(
 
     const result = await executeAgentAction(run, action, spendUsd, appUrl)
 
-    if (result.receipt) {
+    if (result.vaultAdvancedAmountUsdc && !result.vaultRefundedAmountUsdc) {
+      spendUsd = Number(
+        (spendUsd + parseUsdcLabel(result.vaultAdvancedAmountUsdc)).toFixed(6)
+      )
+    } else if (result.receipt) {
       spendUsd = Number(
         (spendUsd + parseUsdcLabel(result.receipt.amountUsdc)).toFixed(6)
       )
@@ -160,16 +175,24 @@ async function executeAgentAction(
       ...started,
       status: 'failed',
       errorMessage:
-        'Production agent payment is not configured. Set AGENT_SPENDER_PRIVATE_KEY and NEXT_PUBLIC_APP_URL before running agent actions.',
+        'Production agent payment signing is not configured. Set AGENT_SPENDER_PRIVATE_KEY and NEXT_PUBLIC_APP_URL so the vault-funded signer can settle x402 payments.',
       completedAt: new Date().toISOString()
     } satisfies AgentAction
   }
 
+  let advanced: AgentAction | null = null
+
   try {
+    advanced = await advanceAgentVaultSpend({
+      runId: run.id,
+      action: started,
+      amountUsd: quotedPrice.amountUsd,
+      amountLabel: quotedPrice.amountLabel
+    })
     await ensureAgentCanPayWithPermit2(quotedPrice.amountUsd)
     const paidResult = await callPaidProductWithAgentWallet(
       run.id,
-      started,
+      advanced,
       appUrl
     )
 
@@ -180,8 +203,30 @@ async function executeAgentAction(
         ? 'failed'
         : 'completed'
 
+    const refundedAdvance =
+      resultStatus === 'failed' && didEscrowRefundBuyer(paidResult)
+        ? await refundAgentVaultAdvance({
+            runId: run.id,
+            action: advanced,
+            amountUsd: quotedPrice.amountUsd,
+            amountLabel: quotedPrice.amountLabel
+          }).catch(error => ({
+            error:
+              error instanceof Error
+                ? error.message
+                : 'Unable to return the refunded x402 payment to the agent vault.'
+          }))
+        : null
+    const refundError =
+      refundedAdvance && 'error' in refundedAdvance
+        ? refundedAdvance.error
+        : undefined
+    const refundFields =
+      refundedAdvance && !('error' in refundedAdvance) ? refundedAdvance : {}
+
     return {
-      ...started,
+      ...advanced,
+      ...refundFields,
       status: resultStatus,
       responsePayload: paidResult.data,
       receipt: paidResult.receipt,
@@ -189,18 +234,52 @@ async function executeAgentAction(
       requestId: paidResult.order?.requestId,
       errorMessage:
         resultStatus === 'failed'
-          ? describeAsyncOrderFailure(paidResult.order)
+          ? [
+              describeAsyncOrderFailure(paidResult.order),
+              refundError
+                ? `The x402 payment was refunded to the signer, but Paykubo could not return it to the agent vault: ${refundError}`
+                : undefined
+            ]
+              .filter(Boolean)
+              .join(' ')
           : undefined,
       completedAt: new Date().toISOString()
     } satisfies AgentAction
   } catch (caughtError) {
+    const refundedAdvance = advanced
+      ? await refundAgentVaultAdvance({
+          runId: run.id,
+          action: advanced,
+          amountUsd: quotedPrice.amountUsd,
+          amountLabel: quotedPrice.amountLabel
+        }).catch(error => ({
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Unable to return the advanced vault spend.'
+        }))
+      : null
+    const refundError =
+      refundedAdvance && 'error' in refundedAdvance
+        ? refundedAdvance.error
+        : undefined
+    const refundFields =
+      refundedAdvance && !('error' in refundedAdvance) ? refundedAdvance : {}
+
     return {
-      ...started,
+      ...(advanced ?? started),
+      ...refundFields,
       status: 'failed',
-      errorMessage:
+      errorMessage: [
         caughtError instanceof Error
           ? caughtError.message
           : 'The paid x402 request failed.',
+        refundError
+          ? `Paykubo advanced this action from the vault, but could not return the unused signer funds: ${refundError}`
+          : undefined
+      ]
+        .filter(Boolean)
+        .join(' '),
       completedAt: new Date().toISOString()
     } satisfies AgentAction
   }
@@ -210,6 +289,78 @@ function parseUsdcLabel(value: string) {
   const amount = Number(value.replace(/[^0-9.]/g, ''))
 
   return Number.isFinite(amount) ? amount : 0
+}
+
+async function advanceAgentVaultSpend({
+  runId,
+  action,
+  amountUsd,
+  amountLabel
+}: {
+  runId: string
+  action: AgentAction
+  amountUsd: number
+  amountLabel: string
+}) {
+  const paymentId = getAgentVaultPaymentId(runId, action.id)
+  const result = await writeAgentRunVault({
+    functionName: 'recordSpend',
+    args: [getAgentRunBytes32(runId), paymentId, parseUsdcToAtomic(amountUsd)]
+  })
+
+  if (!result) {
+    throw new Error(
+      'AgentRunVault spend could not be advanced. Set NEXT_PUBLIC_AGENT_RUN_VAULT_ADDRESS and AGENT_RUN_VAULT_OPERATOR_PRIVATE_KEY so Paykubo can transfer the funded run budget to the agent signer before x402 settlement.'
+    )
+  }
+
+  return {
+    ...action,
+    vaultPaymentId: paymentId,
+    vaultAdvancedAmountUsdc: amountLabel,
+    vaultSpendTxHash: result.txHash,
+    vaultSpendExplorerUrl: result.explorerUrl
+  } satisfies AgentAction
+}
+
+async function refundAgentVaultAdvance({
+  runId,
+  action,
+  amountUsd,
+  amountLabel
+}: {
+  runId: string
+  action: AgentAction
+  amountUsd: number
+  amountLabel: string
+}) {
+  if (!action.vaultPaymentId) {
+    throw new Error('The vault payment ID is missing for this agent action.')
+  }
+
+  const returnTx = await returnAgentSignerUsdcToVault(amountUsd)
+  const refund = await writeAgentRunVault({
+    functionName: 'recordSpendRefund',
+    args: [
+      getAgentRunBytes32(runId),
+      action.vaultPaymentId as Hex,
+      parseUsdcToAtomic(amountUsd)
+    ]
+  })
+
+  if (!refund) {
+    throw new Error(
+      'AgentRunVault refund record could not be written. The signer transfer was submitted, but the operator key or vault address is not configured for recordSpendRefund.'
+    )
+  }
+
+  return {
+    vaultRefundedAmountUsdc: amountLabel,
+    vaultRefundTxHash: refund.txHash,
+    vaultRefundExplorerUrl: refund.explorerUrl,
+    vaultReturnTxHash: returnTx.txHash,
+    vaultReturnExplorerUrl: returnTx.explorerUrl
+  } satisfies Partial<AgentAction>
 }
 
 async function callPaidProductWithAgentWallet(
@@ -478,6 +629,14 @@ function describeAsyncOrderFailure(order: PaidProductCallResponse['order']) {
   )
 }
 
+function didEscrowRefundBuyer(result: PaidProductCallResponse) {
+  return (
+    result.order?.resultReleaseStatus === 'refunded' ||
+    result.order?.escrowStatus === 'refunded' ||
+    result.receipt?.escrowStatus === 'refunded'
+  )
+}
+
 function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -487,9 +646,58 @@ const agentPublicClient = createPublicClient({
   transport: http(defaultAppChain.viemChain.rpcUrls.default.http[0])
 })
 
-const usdcBalanceAbi = parseAbi([
-  'function balanceOf(address owner) view returns (uint256)'
+const usdcAgentAbi = parseAbi([
+  'function balanceOf(address owner) view returns (uint256)',
+  'function transfer(address to, uint256 amount) returns (bool)'
 ])
+
+async function returnAgentSignerUsdcToVault(amountUsd: number) {
+  const privateKey = envServer.AGENT_SPENDER_PRIVATE_KEY
+  const vaultAddress = getAgentRunVaultAddress()
+
+  if (!privateKey) {
+    throw new Error('AGENT_SPENDER_PRIVATE_KEY is not configured.')
+  }
+
+  if (!vaultAddress) {
+    throw new Error('NEXT_PUBLIC_AGENT_RUN_VAULT_ADDRESS is not configured.')
+  }
+
+  const account = privateKeyToAccount(
+    (privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`) as Hex
+  )
+  const walletClient = createWalletClient({
+    account,
+    chain: defaultAppChain.viemChain,
+    transport: http(defaultAppChain.viemChain.rpcUrls.default.http[0])
+  })
+  const txHash = await walletClient
+    .writeContract({
+      address: morphUsdcTokenAddress as Address,
+      abi: usdcAgentAbi,
+      functionName: 'transfer',
+      args: [vaultAddress, parseUsdcToAtomic(amountUsd)]
+    })
+    .catch(error => {
+      throw new Error(
+        `Agent signer could not return unused USDC to the vault. The signer may need Hoodi ETH for gas. ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      )
+    })
+  const receipt = await agentPublicClient.waitForTransactionReceipt({
+    hash: txHash
+  })
+
+  if (receipt.status !== 'success') {
+    throw new Error(`Agent signer USDC return transaction reverted: ${txHash}`)
+  }
+
+  return {
+    txHash,
+    explorerUrl: buildExplorerUrl(txHash)
+  } satisfies AgentVaultWriteResult
+}
 
 async function ensureAgentCanPayWithPermit2(amountUsd: number) {
   const privateKey = envServer.AGENT_SPENDER_PRIVATE_KEY
@@ -511,7 +719,7 @@ async function ensureAgentCanPayWithPermit2(amountUsd: number) {
   const [balance, allowance] = await Promise.all([
     agentPublicClient.readContract({
       address: tokenAddress,
-      abi: usdcBalanceAbi,
+      abi: usdcAgentAbi,
       functionName: 'balanceOf',
       args: [account.address]
     }),
@@ -525,9 +733,9 @@ async function ensureAgentCanPayWithPermit2(amountUsd: number) {
 
   if (balance < requiredAmount) {
     throw new Error(
-      `Agent signer has insufficient USDC. Required ${formatUsdcAmount(
+      `Agent signer did not receive enough USDC from AgentRunVault. Required ${formatUsdcAmount(
         requiredAmount
-      )}, available ${formatUsdcAmount(balance)}. Fund AGENT_SPENDER_PRIVATE_KEY on Morph Hoodi before running paid actions.`
+      )}, available ${formatUsdcAmount(balance)}. Confirm the run vault is funded and AGENT_RUN_VAULT_OPERATOR_PRIVATE_KEY can call recordSpend.`
     )
   }
 
@@ -541,12 +749,20 @@ async function ensureAgentCanPayWithPermit2(amountUsd: number) {
     transport: http(defaultAppChain.viemChain.rpcUrls.default.http[0])
   })
   const approval = createPermit2ApprovalTx(tokenAddress)
-  const txHash = await walletClient.sendTransaction({
-    account,
-    chain: defaultAppChain.viemChain,
-    to: approval.to,
-    data: approval.data
-  })
+  const txHash = await walletClient
+    .sendTransaction({
+      account,
+      chain: defaultAppChain.viemChain,
+      to: approval.to,
+      data: approval.data
+    })
+    .catch(error => {
+      throw new Error(
+        `Agent signer received vault USDC but could not submit the Permit2 approval. Fund the agent signer with a small amount of Hoodi ETH for gas. ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      )
+    })
   const receipt = await agentPublicClient.waitForTransactionReceipt({
     hash: txHash
   })

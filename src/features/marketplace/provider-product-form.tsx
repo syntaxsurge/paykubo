@@ -1003,7 +1003,7 @@ function ScreenToast({
       key={toast.id}
       role='status'
       aria-live='polite'
-      className='border-border bg-card text-card-foreground fixed bottom-4 left-4 z-[100] w-[calc(100vw-2rem)] max-w-md rounded-lg border p-4 shadow-2xl shadow-black/20'
+      className='border-border bg-card text-card-foreground fixed right-4 bottom-4 z-[100] w-[calc(100vw-2rem)] max-w-md rounded-lg border p-4 shadow-2xl shadow-black/20'
     >
       <div className='flex gap-3'>
         <div className='bg-primary/10 text-primary mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg'>
