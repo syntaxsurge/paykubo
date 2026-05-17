@@ -4,6 +4,7 @@ import { FormEvent, type ReactNode, useRef, useState } from 'react'
 
 import { BookOpen, CheckCircle2, Eye, EyeOff, X } from 'lucide-react'
 import { useRouter } from 'nextjs-toploader/app'
+import { createPortal } from 'react-dom'
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -981,35 +982,50 @@ function OpenApiImportPanel({
           {error}
         </p>
       ) : null}
-      {toast ? (
-        <div
-          key={toast.id}
-          role='status'
-          aria-live='polite'
-          className='border-border bg-card text-card-foreground fixed right-4 bottom-4 z-50 w-[calc(100vw-2rem)] max-w-md rounded-lg border p-4 shadow-2xl shadow-black/20'
-        >
-          <div className='flex gap-3'>
-            <div className='bg-primary/10 text-primary mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg'>
-              <CheckCircle2 className='h-5 w-5' aria-hidden />
-            </div>
-            <div className='min-w-0 flex-1'>
-              <p className='text-sm font-semibold'>{toast.title}</p>
-              <p className='text-muted-foreground mt-1 text-sm leading-6'>
-                {toast.description}
-              </p>
-            </div>
-            <button
-              type='button'
-              onClick={() => setToast(null)}
-              aria-label='Dismiss notification'
-              className='text-muted-foreground hover:text-foreground focus-ring -m-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition'
-            >
-              <X className='h-4 w-4' aria-hidden />
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <ScreenToast toast={toast} onDismiss={() => setToast(null)} />
     </Card>
+  )
+}
+
+function ScreenToast({
+  toast,
+  onDismiss
+}: {
+  toast: { description: string; id: number; title: string } | null
+  onDismiss: () => void
+}) {
+  if (!toast || typeof document === 'undefined') {
+    return null
+  }
+
+  return createPortal(
+    <div
+      key={toast.id}
+      role='status'
+      aria-live='polite'
+      className='border-border bg-card text-card-foreground fixed bottom-4 left-4 z-[100] w-[calc(100vw-2rem)] max-w-md rounded-lg border p-4 shadow-2xl shadow-black/20'
+    >
+      <div className='flex gap-3'>
+        <div className='bg-primary/10 text-primary mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg'>
+          <CheckCircle2 className='h-5 w-5' aria-hidden />
+        </div>
+        <div className='min-w-0 flex-1'>
+          <p className='text-sm font-semibold'>{toast.title}</p>
+          <p className='text-muted-foreground mt-1 text-sm leading-6'>
+            {toast.description}
+          </p>
+        </div>
+        <button
+          type='button'
+          onClick={onDismiss}
+          aria-label='Dismiss notification'
+          className='text-muted-foreground hover:text-foreground focus-ring -m-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition'
+        >
+          <X className='h-4 w-4' aria-hidden />
+        </button>
+      </div>
+    </div>,
+    document.body
   )
 }
 
