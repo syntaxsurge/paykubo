@@ -17,6 +17,7 @@ import { AdminHeaderLink } from '@/components/layout/admin-header-link'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { WalletConnectButton } from '@/components/ui/wallet-connect-button'
 import { WalletAddressConsumer } from '@/components/wallet/wallet-address-consumer'
+import { WalletBalanceSummary } from '@/components/wallet/wallet-balance-summary'
 import { useUserSettings } from '@/hooks/use-user-settings'
 import { primaryNav } from '@/lib/config/navigation'
 import { siteConfig } from '@/lib/config/site'
@@ -168,6 +169,9 @@ function ProfileMenuContent({
             <p className='text-muted-foreground truncate text-xs'>{username}</p>
           </div>
         </div>
+        {isAuthenticated ? (
+          <WalletBalanceSummary walletAddress={walletAddress} variant='menu' />
+        ) : null}
         {isAuthenticated ? (
           <div className='my-3 grid gap-1'>
             <MenuLink href='/dashboard' icon={LayoutDashboard}>

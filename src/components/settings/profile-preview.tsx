@@ -2,15 +2,12 @@
 
 import Link from 'next/link'
 
-import { ExternalLink, RefreshCw, WalletCards } from 'lucide-react'
-
 import { buttonClasses } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { WalletAddressConsumer } from '@/components/wallet/wallet-address-consumer'
-import { usePaymentTokenBalance } from '@/hooks/use-payment-token-balance'
+import { WalletBalanceSummary } from '@/components/wallet/wallet-balance-summary'
 import { useUserSettings } from '@/hooks/use-user-settings'
 import { userDisplayName, userInitials } from '@/lib/settings/user-settings'
-import { cn } from '@/lib/utils/cn'
 
 export function ProfilePreview() {
   return (
@@ -26,7 +23,6 @@ function ProfilePreviewContent({
   walletAddress: string | null
 }) {
   const { settings, isLoading } = useUserSettings(walletAddress)
-  const paymentBalance = usePaymentTokenBalance(walletAddress)
 
   if (isLoading) {
     return <div className='skeleton h-80 rounded-lg' />
@@ -58,10 +54,7 @@ function ProfilePreviewContent({
       </Card>
 
       <div className='grid gap-5 lg:grid-cols-2 xl:grid-cols-1'>
-        <PaymentBalancePanel
-          balance={paymentBalance}
-          isConnected={Boolean(walletAddress)}
-        />
+        <WalletBalanceSummary walletAddress={walletAddress} />
         <Card className='space-y-5'>
           <div>
             <p className='text-foreground/60 text-xs tracking-[0.16em] uppercase'>
@@ -81,76 +74,6 @@ function ProfilePreviewContent({
         </Card>
       </div>
     </div>
-  )
-}
-
-function PaymentBalancePanel({
-  balance,
-  isConnected
-}: {
-  balance: ReturnType<typeof usePaymentTokenBalance>
-  isConnected: boolean
-}) {
-  return (
-    <Card className='bg-panel-sheen space-y-5'>
-      <div className='flex items-start justify-between gap-4'>
-        <div>
-          <p className='text-foreground/60 text-xs tracking-[0.16em] uppercase'>
-            Payment balance
-          </p>
-          <h2 className='font-display mt-2 text-2xl'>
-            {balance.formattedBalance} {balance.symbol}
-          </h2>
-          <p className='text-foreground/65 mt-2 text-sm leading-6'>
-            {balance.chainName}
-          </p>
-        </div>
-        <div className='bg-primary/10 text-primary flex h-12 w-12 shrink-0 items-center justify-center rounded-lg'>
-          <WalletCards className='h-5 w-5' aria-hidden />
-        </div>
-      </div>
-
-      {balance.error ? (
-        <p className='text-destructive text-sm'>{balance.error}</p>
-      ) : null}
-
-      <div className='grid gap-3 text-sm sm:grid-cols-2'>
-        <Metric label='Token' value={balance.symbol} />
-        <Metric label='Decimals' value={String(balance.decimals)} />
-      </div>
-
-      <div className='flex flex-col gap-3 sm:flex-row'>
-        <button
-          type='button'
-          className={cn(
-            buttonClasses({ variant: 'outline', className: 'flex-1' }),
-            'disabled:pointer-events-none disabled:opacity-60'
-          )}
-          onClick={() => void balance.refresh()}
-          disabled={!isConnected || balance.isLoading}
-        >
-          <RefreshCw
-            className={cn('h-4 w-4', balance.isLoading && 'animate-spin')}
-            aria-hidden
-          />
-          Refresh
-        </button>
-        {balance.tokenExplorerUrl ? (
-          <a
-            href={balance.tokenExplorerUrl}
-            target='_blank'
-            rel='noreferrer'
-            className={buttonClasses({
-              variant: 'outline',
-              className: 'flex-1'
-            })}
-          >
-            <ExternalLink className='h-4 w-4' aria-hidden />
-            Token
-          </a>
-        ) : null}
-      </div>
-    </Card>
   )
 }
 
