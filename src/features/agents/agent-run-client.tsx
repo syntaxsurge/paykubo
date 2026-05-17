@@ -1375,10 +1375,13 @@ function AsyncPollingPanel({
   action: AgentRun['actions'][number]
 }) {
   const poll = getLatestAsyncPoll(action)
+  const pollingUrl = poll?.pollingUrl
 
   if (!poll) {
     return null
   }
+
+  const displayUrl = formatDisplayUrl(pollingUrl)
 
   return (
     <div className='border-border/80 bg-card/45 mt-4 overflow-hidden rounded-lg border'>
@@ -1395,23 +1398,23 @@ function AsyncPollingPanel({
             <p className='text-foreground/55 text-xs tracking-[0.14em] uppercase'>
               Polling endpoint
             </p>
-            <p className='mt-1 truncate font-semibold'>
-              {formatDisplayUrl(poll.pollingUrl).host}
-            </p>
+            <p className='mt-1 truncate font-semibold'>{displayUrl.host}</p>
             <p className='text-foreground/55 mt-1 truncate text-xs'>
-              {formatDisplayUrl(poll.pollingUrl).path}
+              {displayUrl.path}
             </p>
           </div>
-          <a
-            href={poll.pollingUrl}
-            target='_blank'
-            rel='noreferrer'
-            className='border-border bg-card/70 text-primary inline-flex h-9 w-9 items-center justify-center rounded-lg border'
-            title='Open polling URL'
-            aria-label='Open polling URL'
-          >
-            <ExternalLink className='h-4 w-4' aria-hidden />
-          </a>
+          {pollingUrl ? (
+            <a
+              href={pollingUrl}
+              target='_blank'
+              rel='noreferrer'
+              className='border-border bg-card/70 text-primary inline-flex h-9 w-9 items-center justify-center rounded-lg border'
+              title='Open polling URL'
+              aria-label='Open polling URL'
+            >
+              <ExternalLink className='h-4 w-4' aria-hidden />
+            </a>
+          ) : null}
         </div>
       </div>
       <details className='border-border/70 border-t'>
@@ -1692,7 +1695,14 @@ function CompactLinkPreview({ href }: { href: string }) {
   )
 }
 
-function formatDisplayUrl(href: string) {
+function formatDisplayUrl(href?: string | null) {
+  if (!href) {
+    return {
+      host: 'Not recorded',
+      path: 'This run was created before polling URLs were captured.'
+    }
+  }
+
   try {
     const url = new URL(href)
     const path = `${url.pathname}${url.search}`
@@ -1959,7 +1969,11 @@ function humanizePath(path: string) {
     .replace(/\b\w/g, char => char.toUpperCase())
 }
 
-function shorten(value: string) {
+function shorten(value?: string | null) {
+  if (!value) {
+    return ''
+  }
+
   if (value.length <= 18) {
     return value
   }
