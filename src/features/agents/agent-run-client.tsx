@@ -15,7 +15,6 @@ import {
   type LucideIcon,
   Play,
   ReceiptText,
-  Route,
   ShieldCheck,
   Sparkles,
   Undo2,
@@ -324,75 +323,180 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
   const finalOutputs = collectFinalOutputs(run)
 
   return (
-    <div className='space-y-6'>
-      <section className='grid gap-4 xl:grid-cols-[1fr_360px]'>
-        <Card className='space-y-5 overflow-hidden'>
-          <div className='flex flex-wrap items-start justify-between gap-4'>
-            <div className='space-y-2'>
-              <div className='text-primary flex items-center gap-2'>
-                <Bot className='h-5 w-5' aria-hidden />
-                <span className='text-xs font-semibold tracking-[0.18em] uppercase'>
-                  Agent run
-                </span>
-              </div>
-              <h2 className='font-display text-3xl leading-tight'>
+    <div className='space-y-5'>
+      <section className='grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]'>
+        <div className='space-y-5'>
+          <RunSummaryCard
+            run={run}
+            completedPaidActions={completedPaidActions}
+          />
+          <FinalOutputSection outputs={finalOutputs} run={run} />
+        </div>
+
+        <RunControlPanel
+          run={run}
+          address={address}
+          status={status}
+          isFunding={isFunding}
+          isRunning={isRunning}
+          isRefunding={isRefunding}
+          isAttesting={isAttesting}
+          canRun={canRun}
+          canRefund={canRefund}
+          onFund={fundRun}
+          onRun={executeRun}
+          onRefund={refundUnusedBudget}
+          onAttest={attestRun}
+        />
+      </section>
+
+      <ExecutionSection run={run} />
+
+      <AdvancedRunDetails run={run} />
+    </div>
+  )
+}
+
+function RunSummaryCard({
+  run,
+  completedPaidActions
+}: {
+  run: AgentRun
+  completedPaidActions: number
+}) {
+  return (
+    <Card className='overflow-hidden p-0'>
+      <div className='border-border/70 bg-background/35 border-b p-5 sm:p-6'>
+        <div className='flex flex-wrap items-start justify-between gap-4'>
+          <div className='min-w-0 space-y-3'>
+            <div className='text-primary flex items-center gap-2'>
+              <Bot className='h-5 w-5' aria-hidden />
+              <span className='text-xs font-semibold tracking-[0.18em] uppercase'>
+                Agent workspace
+              </span>
+            </div>
+            <div>
+              <h2 className='font-display max-w-4xl text-2xl leading-tight font-semibold text-balance sm:text-3xl'>
                 {run.title}
               </h2>
-              <p className='text-foreground/65 max-w-3xl text-sm leading-6'>
+              <p className='text-foreground/65 mt-2 max-w-3xl text-sm leading-6'>
                 {run.objective}
               </p>
             </div>
-            <StatusPill status={run.status} />
           </div>
+          <StatusPill status={run.status} />
+        </div>
+      </div>
 
-          <div className='grid gap-3 md:grid-cols-4'>
-            <MetricCard
-              icon={WalletCards}
-              label='Funded'
-              value={run.fundedAmountUsdc}
-            />
-            <MetricCard
-              icon={CircleDollarSign}
-              label='Spent'
-              value={run.spentAmountUsdc}
-            />
-            <MetricCard
-              icon={Undo2}
-              label='Available'
-              value={run.availableAmountUsdc}
-            />
-            <MetricCard
-              icon={Sparkles}
-              label='Planner'
-              value={formatPlanner(run)}
-            />
-          </div>
+      <div className='space-y-5 p-5 sm:p-6'>
+        <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-4'>
+          <SummaryStat
+            icon={WalletCards}
+            label='Funded'
+            value={run.fundedAmountUsdc}
+          />
+          <SummaryStat
+            icon={CircleDollarSign}
+            label='Spent'
+            value={run.spentAmountUsdc}
+          />
+          <SummaryStat
+            icon={Undo2}
+            label='Available'
+            value={run.availableAmountUsdc}
+          />
+          <SummaryStat
+            icon={Sparkles}
+            label='Planner'
+            value={formatPlanner(run)}
+          />
+        </div>
 
-          <div className='border-border/80 bg-muted/25 rounded-lg border p-4'>
-            <p className='font-semibold'>{agentRunStatusLabels[run.status]}</p>
-            <p className='text-foreground/65 mt-1 text-sm leading-6'>
-              {agentRunStatusDetails[run.status]}
+        <StatusNotice run={run} completedPaidActions={completedPaidActions} />
+      </div>
+    </Card>
+  )
+}
+
+function StatusNotice({
+  run,
+  completedPaidActions
+}: {
+  run: AgentRun
+  completedPaidActions: number
+}) {
+  const Icon = statusIcon(run.status)
+
+  return (
+    <div className='border-border/80 bg-muted/20 rounded-lg border p-4'>
+      <div className='flex items-start gap-3'>
+        <span className='bg-primary/10 text-primary mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full'>
+          <Icon className='h-4 w-4' aria-hidden />
+        </span>
+        <div className='min-w-0'>
+          <p className='font-semibold'>{agentRunStatusLabels[run.status]}</p>
+          <p className='text-foreground/65 mt-1 text-sm leading-6'>
+            {agentRunStatusDetails[run.status]}
+          </p>
+          {run.status === 'failed' && completedPaidActions === 0 ? (
+            <p className='mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm leading-6 text-red-600 dark:text-red-300'>
+              No paid tool completed with a receipt, so Paykubo is showing
+              diagnostics instead of treating generated copy as verified output.
             </p>
-            {run.status === 'failed' && completedPaidActions === 0 ? (
-              <p className='mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm leading-6 text-red-600 dark:text-red-300'>
-                No paid tool completed with a receipt, so Paykubo is showing
-                diagnostics instead of treating the generated copy as verified
-                launch output.
-              </p>
-            ) : null}
-          </div>
-        </Card>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
+}
 
-        <Card className='space-y-4 xl:sticky xl:top-28 xl:self-start'>
-          <div>
-            <p className='text-foreground/60 text-xs tracking-[0.16em] uppercase'>
-              Controls
-            </p>
-            <p className='mt-1 text-lg font-semibold'>Budget and lifecycle</p>
-          </div>
+function RunControlPanel({
+  run,
+  address,
+  status,
+  isFunding,
+  isRunning,
+  isRefunding,
+  isAttesting,
+  canRun,
+  canRefund,
+  onFund,
+  onRun,
+  onRefund,
+  onAttest
+}: {
+  run: AgentRun
+  address?: string
+  status: string
+  isFunding: boolean
+  isRunning: boolean
+  isRefunding: boolean
+  isAttesting: boolean
+  canRun: boolean
+  canRefund: boolean
+  onFund: () => void
+  onRun: () => void
+  onRefund: () => void
+  onAttest: () => void
+}) {
+  return (
+    <aside className='xl:sticky xl:top-28 xl:self-start'>
+      <Card className='space-y-5'>
+        <div className='space-y-1'>
+          <p className='text-foreground/60 text-xs tracking-[0.16em] uppercase'>
+            Run controls
+          </p>
+          <h3 className='text-lg font-semibold'>Fund, run, prove</h3>
+          <p className='text-foreground/60 text-sm leading-6'>
+            Spend is capped by the funded budget and each paid tool records a
+            receipt.
+          </p>
+        </div>
+
+        <div className='grid gap-2'>
           <Button
             className='w-full'
-            onClick={fundRun}
+            onClick={onFund}
             disabled={
               isFunding ||
               !['unfunded', 'funding_pending'].includes(run.fundingStatus)
@@ -403,7 +507,7 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
           </Button>
           <Button
             className='w-full'
-            onClick={executeRun}
+            onClick={onRun}
             disabled={isRunning || !canRun}
           >
             <Play className='h-4 w-4' aria-hidden />
@@ -413,26 +517,28 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
                 ? 'Retry actions'
                 : 'Run actions'}
           </Button>
-          <Button
-            className='w-full'
-            variant='outline'
-            onClick={refundUnusedBudget}
-            disabled={isRefunding || !canRefund}
-          >
-            <Undo2 className='h-4 w-4' aria-hidden />
-            {isRefunding ? 'Refunding' : 'Refund unused'}
-          </Button>
-          <Button
-            className='w-full'
-            variant='outline'
-            onClick={attestRun}
-            disabled={
-              isAttesting || !['completed', 'attesting'].includes(run.status)
-            }
-          >
-            <FileCheck2 className='h-4 w-4' aria-hidden />
-            {isAttesting ? 'Writing proof' : 'Attest proof'}
-          </Button>
+          <div className='grid grid-cols-2 gap-2'>
+            <Button
+              className='w-full px-3'
+              variant='outline'
+              onClick={onRefund}
+              disabled={isRefunding || !canRefund}
+            >
+              <Undo2 className='h-4 w-4' aria-hidden />
+              {isRefunding ? 'Refunding' : 'Refund'}
+            </Button>
+            <Button
+              className='w-full px-3'
+              variant='outline'
+              onClick={onAttest}
+              disabled={
+                isAttesting || !['completed', 'attesting'].includes(run.status)
+              }
+            >
+              <FileCheck2 className='h-4 w-4' aria-hidden />
+              {isAttesting ? 'Writing' : 'Attest'}
+            </Button>
+          </div>
           {run.proof ? (
             <Link
               href={`/proofs/${run.proof.id}`}
@@ -446,32 +552,82 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
               Open proof
             </Link>
           ) : null}
-          {status ? (
-            <p
-              className='border-border bg-muted/40 rounded-lg border p-3 text-sm leading-6 break-words'
-              role='status'
-            >
-              {status}
-            </p>
-          ) : null}
-          <div className='border-border rounded-lg border p-3 text-sm'>
-            <p className='text-foreground/60 text-xs tracking-[0.14em] uppercase'>
-              Connected wallet
-            </p>
-            <p className='mt-1 font-semibold break-all'>
-              {address ?? 'Not connected'}
-            </p>
-          </div>
-        </Card>
-      </section>
+        </div>
 
-      <section className='grid gap-4 xl:grid-cols-[0.85fr_1.15fr]'>
-        <Card className='space-y-4'>
-          <div className='flex items-center gap-2'>
-            <ShieldCheck className='text-primary h-5 w-5' aria-hidden />
-            <h3 className='text-lg font-semibold'>Funding ledger</h3>
+        {status ? (
+          <p
+            className='border-border bg-muted/35 rounded-lg border p-3 text-sm leading-6 break-words'
+            role='status'
+          >
+            {status}
+          </p>
+        ) : null}
+
+        <div className='border-border/80 grid gap-2 rounded-lg border p-3 text-sm'>
+          <div className='flex items-center justify-between gap-3'>
+            <span className='text-foreground/60'>Funding</span>
+            <span className='font-semibold'>{run.fundingStatus}</span>
           </div>
-          <div className='grid gap-3 md:grid-cols-2'>
+          <div className='flex items-center justify-between gap-3'>
+            <span className='text-foreground/60'>Wallet</span>
+            <span className='max-w-36 truncate font-semibold'>
+              {address ?? 'Not connected'}
+            </span>
+          </div>
+        </div>
+      </Card>
+    </aside>
+  )
+}
+
+function ExecutionSection({ run }: { run: AgentRun }) {
+  return (
+    <section className='space-y-3'>
+      <div className='flex flex-wrap items-end justify-between gap-3'>
+        <div>
+          <p className='text-primary text-xs font-semibold tracking-[0.16em] uppercase'>
+            Execution
+          </p>
+          <h3 className='mt-1 text-xl font-semibold'>Tool calls</h3>
+        </div>
+        <span className='text-foreground/60 text-sm'>
+          {run.actions.length} planned action
+          {run.actions.length === 1 ? '' : 's'}
+        </span>
+      </div>
+      {run.actions.length === 0 ? (
+        <div className='border-border text-foreground/65 rounded-lg border border-dashed p-5 text-sm leading-6'>
+          Actions appear here after the planner chooses tools.
+        </div>
+      ) : (
+        <div className='grid gap-3'>
+          {run.actions.map(action => (
+            <ActionCard key={action.id} action={action} />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function AdvancedRunDetails({ run }: { run: AgentRun }) {
+  return (
+    <section className='space-y-3'>
+      <details className='group border-border/80 bg-card/75 overflow-hidden rounded-lg border'>
+        <summary className='flex cursor-pointer list-none items-center justify-between gap-4 p-4 [&::-webkit-details-marker]:hidden'>
+          <span className='flex items-center gap-2 font-semibold'>
+            <ShieldCheck className='text-primary h-4 w-4' aria-hidden />
+            Funding and skipped-tool details
+          </span>
+          <span className='text-foreground/55 text-sm group-open:hidden'>
+            Expand
+          </span>
+          <span className='text-foreground/55 hidden text-sm group-open:inline'>
+            Collapse
+          </span>
+        </summary>
+        <div className='border-border/70 space-y-5 border-t p-4'>
+          <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
             <DetailLink
               label='Vault'
               value={run.vaultAddress}
@@ -494,78 +650,65 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
             />
           </div>
           <LedgerTimeline events={run.ledgerEvents} />
-        </Card>
+          <SkippedTools tools={run.deliverables.skippedTools ?? []} />
+        </div>
+      </details>
 
-        <Card className='space-y-4'>
-          <div className='flex items-center gap-2'>
-            <Route className='text-primary h-5 w-5' aria-hidden />
-            <h3 className='text-lg font-semibold'>Paid actions</h3>
+      <JsonViewer
+        title='Planner, receipts, and deliverable diagnostics'
+        value={run.deliverables}
+        defaultOpen={false}
+        copyLabel='Copy diagnostics'
+      />
+    </section>
+  )
+}
+
+function SummaryStat({
+  icon: Icon,
+  label,
+  value
+}: {
+  icon: LucideIcon
+  label: string
+  value: string
+}) {
+  return (
+    <div className='border-border/70 bg-background/45 rounded-lg border p-3'>
+      <div className='flex items-center gap-2'>
+        <Icon className='text-primary h-4 w-4' aria-hidden />
+        <p className='text-foreground/60 text-xs tracking-[0.14em] uppercase'>
+          {label}
+        </p>
+      </div>
+      <p className='mt-2 text-sm font-semibold break-words'>{value}</p>
+    </div>
+  )
+}
+
+function SkippedTools({
+  tools
+}: {
+  tools: NonNullable<AgentRun['deliverables']['skippedTools']>
+}) {
+  if (tools.length === 0) {
+    return null
+  }
+
+  return (
+    <div className='space-y-3'>
+      <p className='font-semibold'>Skipped tools</p>
+      <div className='grid gap-3 md:grid-cols-2'>
+        {tools.map(tool => (
+          <div
+            key={tool.slug}
+            className='border-border bg-muted/20 rounded-lg border p-3 text-sm'
+          >
+            <p className='font-semibold'>{tool.productName ?? tool.slug}</p>
+            <p className='text-foreground/65 mt-1 leading-6'>{tool.reason}</p>
           </div>
-          {run.actions.length === 0 ? (
-            <p className='text-foreground/65 text-sm leading-6'>
-              Actions appear here after the planner chooses tools.
-            </p>
-          ) : (
-            <div className='grid gap-3'>
-              {run.actions.map(action => (
-                <ActionCard key={action.id} action={action} />
-              ))}
-            </div>
-          )}
-        </Card>
-      </section>
-
-      {run.deliverables.skippedTools?.length ? (
-        <Card className='space-y-3'>
-          <div className='flex items-center gap-2'>
-            <Route className='text-primary h-4 w-4' aria-hidden />
-            <p className='font-semibold'>Skipped tools</p>
-          </div>
-          <div className='grid gap-3 md:grid-cols-2'>
-            {run.deliverables.skippedTools.map(tool => (
-              <div
-                key={tool.slug}
-                className='border-border bg-muted/20 rounded-lg border p-3 text-sm'
-              >
-                <p className='font-semibold'>{tool.productName ?? tool.slug}</p>
-                <p className='text-foreground/65 mt-1 leading-6'>
-                  {tool.reason}
-                </p>
-              </div>
-            ))}
-          </div>
-        </Card>
-      ) : null}
-
-      {hasDeliverableSummary(run) ? (
-        <section className='grid gap-4 xl:grid-cols-[1.2fr_0.8fr]'>
-          <DeliverableCard
-            title='Launch brief'
-            value={run.deliverables.launchBrief}
-          />
-          <div className='grid gap-4'>
-            <DeliverableCard
-              title='Developer copy'
-              value={run.deliverables.developerCopy}
-            />
-            <DeliverableCard
-              title='Market signal'
-              value={run.deliverables.marketSignal}
-            />
-          </div>
-        </section>
-      ) : null}
-
-      <FinalOutputSection outputs={finalOutputs} run={run} />
-
-      <Card>
-        <JsonViewer
-          title='Planner, receipts, and deliverable diagnostics'
-          value={run.deliverables}
-          defaultOpen={false}
-          copyLabel='Copy diagnostics'
-        />
-      </Card>
+        ))}
+      </div>
     </div>
   )
 }
@@ -578,26 +721,6 @@ function StatusPill({ status }: { status: AgentRun['status'] }) {
       <Icon className='text-primary h-4 w-4' aria-hidden />
       {agentRunStatusLabels[status]}
     </span>
-  )
-}
-
-function MetricCard({
-  icon: Icon,
-  label,
-  value
-}: {
-  icon: LucideIcon
-  label: string
-  value: string
-}) {
-  return (
-    <div className='border-border bg-background/60 rounded-lg border p-4'>
-      <Icon className='text-primary h-4 w-4' aria-hidden />
-      <p className='text-foreground/60 mt-3 text-xs tracking-[0.14em] uppercase'>
-        {label}
-      </p>
-      <p className='mt-1 font-semibold break-words'>{value}</p>
-    </div>
   )
 }
 
@@ -800,32 +923,6 @@ function statusIcon(status: AgentRun['status']) {
   }
 
   return Bot
-}
-
-function hasDeliverableSummary(run: AgentRun) {
-  return Boolean(
-    run.deliverables.launchBrief ||
-      run.deliverables.developerCopy ||
-      run.deliverables.marketSignal
-  )
-}
-
-function DeliverableCard({ title, value }: { title: string; value?: string }) {
-  if (!value) {
-    return null
-  }
-
-  return (
-    <Card className='space-y-3 overflow-hidden'>
-      <p className='text-foreground/60 text-xs tracking-[0.16em] uppercase'>
-        {title}
-      </p>
-      <MarkdownViewer
-        value={value}
-        className='max-h-[34rem] overflow-auto pr-2'
-      />
-    </Card>
-  )
 }
 
 function FinalOutputSection({
