@@ -57,6 +57,7 @@ const clientSchema = z.object({
   NEXT_PUBLIC_PAYMENT_TOKEN_SYMBOL: optionalString,
   NEXT_PUBLIC_PAYMENT_TOKEN_VERSION: optionalString,
   NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS: optionalNumber,
+  NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD: optionalString,
   NEXT_PUBLIC_WALLET_PROVIDER: z.preprocess(
     value => (value === '' ? undefined : value),
     z.enum(['thirdweb', 'rainbow-kit', 'rainbowkit']).optional()
@@ -109,5 +110,7 @@ export const envClient = clientSchema.parse({
     process.env.NEXT_PUBLIC_PAYMENT_TOKEN_VERSION,
   NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS:
     process.env.NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS,
+  NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD:
+    process.env.NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD,
   NEXT_PUBLIC_WALLET_PROVIDER: process.env.NEXT_PUBLIC_WALLET_PROVIDER
 })

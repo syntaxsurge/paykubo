@@ -656,9 +656,11 @@ Before creating a new helper or service file:
   payment requirements use the settlement token's EIP-712 domain metadata in
   `NEXT_PUBLIC_PAYMENT_TOKEN_NAME`, `NEXT_PUBLIC_PAYMENT_TOKEN_VERSION`, and
   `NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS`; the configured settlement token address
-  comes from `NEXT_PUBLIC_PAYMENT_TOKEN_ADDRESS`. Signed x402 payloads, Permit2
-  checks, agent vault funding, and escrow reserves must use that token metadata
-  for facilitator verification and settlement. Vault spend and refund writes
+  comes from `NEXT_PUBLIC_PAYMENT_TOKEN_ADDRESS`, and
+  `NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD` selects the x402 EVM transfer
+  mode used in payment requirements. Signed x402 payloads, Permit2 checks,
+  agent vault funding, and escrow reserves must use that token metadata for
+  facilitator verification and settlement. Vault spend and refund writes
   wait for successful transaction receipts, and refund recovery reads the
   vault's live spent amount before calling `recordSpendRefund` so retries and
   partially recovered failures do not request a larger refund than the current

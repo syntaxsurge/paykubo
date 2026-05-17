@@ -50,7 +50,10 @@ import { useAutoPolling } from '@/hooks/use-auto-polling'
 import {
   defaultAppChain,
   getExplorerTransactionUrl,
-  paymentTokenDecimals
+  paymentTokenAddress,
+  paymentTokenDecimals,
+  paymentTokenSymbol,
+  x402Network
 } from '@/lib/config/chains'
 import { walletProvider } from '@/lib/config/wallet'
 import { cn } from '@/lib/utils/cn'
@@ -149,7 +152,8 @@ type PaidProductCallBody = PaidApiErrorBody & {
 }
 
 const usdcBalanceAbi = parseAbi([
-  'function balanceOf(address owner) view returns (uint256)'
+  'function balanceOf(address owner) view returns (uint256)',
+  'function decimals() view returns (uint8)'
 ])
 const ASYNC_JOB_POLL_INTERVAL_MS = 8000
 const TRANSIENT_RETRY_ATTEMPTS = 3
@@ -1754,7 +1758,15 @@ function PaymentRequirementCard({
 }: {
   inspection: PaymentRequirementInspection
 }) {
-  const requirement = inspection.paymentRequired?.accepts[0]
+  const requirement = inspection.paymentRequired
+    ? getPreferredPaymentRequirement(inspection.paymentRequired)
+    : undefined
+  const tokenSymbol = requirement
+    ? getRequirementTokenSymbol(requirement)
+    : paymentTokenSymbol
+  const tokenDecimals = requirement
+    ? getRequirementTokenDecimals(requirement)
+    : paymentTokenDecimals
 
   return (
     <Card className='space-y-4'>
@@ -1765,7 +1777,10 @@ function PaymentRequirementCard({
           </p>
           <h2 className='mt-2 text-lg font-semibold'>
             {requirement
-              ? `${formatUsdcAmount(BigInt(requirement.amount))} USDC required`
+              ? `${formatPaymentTokenAmount(
+                  BigInt(requirement.amount),
+                  tokenDecimals
+                )} ${tokenSymbol} required`
               : 'x402 payment requirement returned'}
           </h2>
         </div>
@@ -2245,11 +2260,22 @@ async function ensurePermit2Allowance(
 ) {
   onStep('allowance', {
     status: 'active',
-    detail: 'Checking USDC balance and Permit2 allowance.'
+    detail: `Checking ${paymentTokenSymbol} balance and Permit2 allowance.`
   })
   const requirement = getPermit2Requirement(paymentRequired)
 
   if (!requirement) {
+    const mismatchedRequirement =
+      getMismatchedPermit2Requirement(paymentRequired)
+
+    if (mismatchedRequirement) {
+      throw new Error(
+        `The x402 quote is for token ${mismatchedRequirement.asset} on ${
+          mismatchedRequirement.network
+        }, but this app is configured for ${paymentTokenSymbol} ${paymentTokenAddress} on ${x402Network}. Refresh the page and create a new order so the quote uses the current payment token.`
+      )
+    }
+
     onStep('allowance', {
       status: 'complete',
       detail: 'This payment requirement does not need Permit2 approval.'
@@ -2261,7 +2287,7 @@ async function ensurePermit2Allowance(
 
   if (!isHexAddress(tokenAddress)) {
     throw new Error(
-      'The x402 payment requirement did not include a valid USDC token address.'
+      `The x402 payment requirement did not include a valid ${paymentTokenSymbol} token address.`
     )
   }
 
@@ -2270,14 +2296,16 @@ async function ensurePermit2Allowance(
   if (requiredAmount <= 0n) {
     onStep('allowance', {
       status: 'complete',
-      detail: 'No USDC allowance is needed for a zero-amount request.'
+      detail: `No ${paymentTokenSymbol} allowance is needed for a zero-amount request.`
     })
     return
   }
 
-  onStatus(`Checking USDC Permit2 allowance on ${defaultAppChain.shortName}.`)
+  onStatus(
+    `Checking ${paymentTokenSymbol} Permit2 allowance on ${defaultAppChain.shortName}.`
+  )
 
-  const [balance, allowance] = await withTransientRetries(
+  const [balance, allowance, tokenDecimals] = await withTransientRetries(
     () =>
       Promise.all([
         paymentChainPublicClient.readContract({
@@ -2291,7 +2319,12 @@ async function ensurePermit2Allowance(
             tokenAddress,
             ownerAddress: walletControls.signer.address
           })
-        )
+        ),
+        paymentChainPublicClient.readContract({
+          address: tokenAddress,
+          abi: usdcBalanceAbi,
+          functionName: 'decimals'
+        })
       ]),
     {
       onRetry: ({ nextAttempt, maxAttempts }) =>
@@ -2303,24 +2336,26 @@ async function ensurePermit2Allowance(
 
   if (balance < requiredAmount) {
     throw new Error(
-      `Insufficient USDC balance. This API call needs ${formatUsdcAmount(
-        requiredAmount
-      )} USDC, but the connected wallet has ${formatUsdcAmount(
-        balance
-      )} USDC on ${defaultAppChain.shortName}.`
+      `Insufficient ${paymentTokenSymbol} balance. This API call needs ${formatPaymentTokenAmount(
+        requiredAmount,
+        tokenDecimals
+      )} ${paymentTokenSymbol}, but the connected wallet has ${formatPaymentTokenAmount(
+        balance,
+        tokenDecimals
+      )} ${paymentTokenSymbol} on ${defaultAppChain.shortName}. Token: ${tokenAddress}.`
     )
   }
 
   if (allowance >= requiredAmount) {
     onStep('allowance', {
       status: 'complete',
-      detail: 'USDC Permit2 allowance is already sufficient.'
+      detail: `${paymentTokenSymbol} Permit2 allowance is already sufficient.`
     })
     return
   }
 
   onStatus(
-    'Approve the one-time USDC Permit2 allowance in your wallet, then the gateway will continue the paid API run.'
+    `Approve the one-time ${paymentTokenSymbol} Permit2 allowance in your wallet, then the gateway will continue the paid API run.`
   )
 
   const approvalTransaction = createPermit2ApprovalTx(tokenAddress)
@@ -2336,10 +2371,12 @@ async function ensurePermit2Allowance(
 
   onStep('allowance', {
     status: 'active',
-    detail: 'USDC approval transaction submitted.',
+    detail: `${paymentTokenSymbol} approval transaction submitted.`,
     txHash: transactionHash
   })
-  onStatus(`Waiting for USDC Permit2 approval to confirm: ${transactionHash}`)
+  onStatus(
+    `Waiting for ${paymentTokenSymbol} Permit2 approval to confirm: ${transactionHash}`
+  )
 
   const receipt = await withTransientRetries(
     () =>
@@ -2355,7 +2392,9 @@ async function ensurePermit2Allowance(
   )
 
   if (receipt.status !== 'success') {
-    throw new Error('USDC Permit2 approval transaction did not succeed.')
+    throw new Error(
+      `${paymentTokenSymbol} Permit2 approval transaction did not succeed.`
+    )
   }
 
   onStep('allowance', {
@@ -2363,7 +2402,9 @@ async function ensurePermit2Allowance(
     detail: 'Waiting for USDC allowance to update.',
     txHash: transactionHash
   })
-  onStatus('Confirming the new USDC Permit2 allowance is readable.')
+  onStatus(
+    `Confirming the new ${paymentTokenSymbol} Permit2 allowance is readable.`
+  )
 
   await waitForPermit2Allowance({
     tokenAddress,
@@ -2373,7 +2414,7 @@ async function ensurePermit2Allowance(
 
   onStep('allowance', {
     status: 'complete',
-    detail: 'USDC Permit2 approval confirmed on-chain.',
+    detail: `${paymentTokenSymbol} Permit2 approval confirmed on-chain.`,
     txHash: transactionHash
   })
 }
@@ -2403,16 +2444,60 @@ async function waitForPermit2Allowance({
   }
 
   throw new Error(
-    'USDC Permit2 approval was submitted, but the updated allowance is not readable yet. Wait a moment, then run with wallet again.'
+    `${paymentTokenSymbol} Permit2 approval was submitted, but the updated allowance is not readable yet. Wait a moment, then run with wallet again.`
+  )
+}
+
+type PaymentRequirement = PaymentRequired['accepts'][number]
+
+function getPreferredPaymentRequirement(paymentRequired: PaymentRequired) {
+  return (
+    paymentRequired.accepts.find(isConfiguredPaymentRequirement) ??
+    paymentRequired.accepts[0]
   )
 }
 
 function getPermit2Requirement(paymentRequired: PaymentRequired) {
-  return paymentRequired.accepts.find(requirement => {
-    const assetTransferMethod = requirement.extra?.assetTransferMethod
+  return paymentRequired.accepts.find(
+    requirement =>
+      isPermit2PaymentRequirement(requirement) &&
+      isConfiguredPaymentRequirement(requirement)
+  )
+}
 
-    return assetTransferMethod === 'permit2'
-  })
+function getMismatchedPermit2Requirement(paymentRequired: PaymentRequired) {
+  return paymentRequired.accepts.find(
+    requirement =>
+      isPermit2PaymentRequirement(requirement) &&
+      !isConfiguredPaymentRequirement(requirement)
+  )
+}
+
+function isPermit2PaymentRequirement(requirement: PaymentRequirement) {
+  return requirement.extra?.assetTransferMethod === 'permit2'
+}
+
+function isConfiguredPaymentRequirement(requirement: PaymentRequirement) {
+  return (
+    requirement.network === x402Network &&
+    requirement.asset.toLowerCase() === paymentTokenAddress.toLowerCase()
+  )
+}
+
+function getRequirementTokenDecimals(requirement: PaymentRequirement) {
+  const extraDecimals = Number(requirement.extra?.decimals)
+
+  return Number.isInteger(extraDecimals) && extraDecimals >= 0
+    ? extraDecimals
+    : paymentTokenDecimals
+}
+
+function getRequirementTokenSymbol(requirement: PaymentRequirement) {
+  const extraSymbol = requirement.extra?.symbol
+
+  return typeof extraSymbol === 'string' && extraSymbol.length > 0
+    ? extraSymbol
+    : paymentTokenSymbol
 }
 
 function stringifyPayloadPath(data: unknown, path: string) {
@@ -2447,13 +2532,13 @@ function shortenHash(value: string) {
   return `${value.slice(0, 10)}...${value.slice(-8)}`
 }
 
-function formatUsdcAmount(amount: bigint) {
-  return Number(formatUnits(amount, paymentTokenDecimals)).toLocaleString(
-    undefined,
-    {
-      maximumFractionDigits: 6
-    }
-  )
+function formatPaymentTokenAmount(
+  amount: bigint,
+  decimals = paymentTokenDecimals
+) {
+  return Number(formatUnits(amount, decimals)).toLocaleString(undefined, {
+    maximumFractionDigits: 6
+  })
 }
 
 async function readResponseBody(response: Response) {

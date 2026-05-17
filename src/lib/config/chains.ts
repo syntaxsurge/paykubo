@@ -86,6 +86,8 @@ export const paymentTokenVersion =
   envClient.NEXT_PUBLIC_PAYMENT_TOKEN_VERSION ?? '2'
 export const paymentTokenDecimals =
   envClient.NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS ?? 6
+export const paymentTokenTransferMethod =
+  envClient.NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD ?? 'permit2'
 
 export function toPaymentAssetAmount(amountUsd: number) {
   return {
@@ -96,7 +98,10 @@ export function toPaymentAssetAmount(amountUsd: number) {
     asset: paymentTokenAddress,
     extra: {
       name: paymentTokenName,
-      version: paymentTokenVersion
+      symbol: paymentTokenSymbol,
+      version: paymentTokenVersion,
+      decimals: paymentTokenDecimals,
+      assetTransferMethod: paymentTokenTransferMethod
     }
   }
 }
