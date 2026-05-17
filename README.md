@@ -1,21 +1,22 @@
 # Paykubo
 
-USDC-native API commerce for humans, applications, and AI agents on Morph.
+USDC-native API commerce for humans, applications, and AI agents on configurable
+EVM rails.
 
 Paykubo is a paid API marketplace and gateway. Providers list paid endpoints,
-buyers and agents pay per request using USDC on Morph, and Paykubo handles
+buyers and agents pay per request using the configured payment token, and Paykubo handles
 discovery, x402 payment flow, request forwarding, receipts, usage records, and
 provider dashboards.
 
 ## Highlights
 
 - Next.js 15 + React 19 App Router setup.
-- Morph Hoodi chain configuration with ETH gas and RainbowKit wallet support.
-- Morph Passport integration for RainbowKit-compatible wallet onboarding.
+- Configurable EVM chain metadata with native gas and RainbowKit wallet support.
+- RainbowKit-compatible wallet onboarding.
 - Marketplace catalog with USDC prices, provider badges, x402 flags, and
   agent-ready API details.
 - Autonomous Launch Pack Agent runs with an OpenAI planner and synthesizer that
-  choose paid tools, buy selected APIs, return deliverables, and publish Morph
+  choose paid tools, buy selected APIs, return deliverables, and publish on-chain
   proof pages. A deterministic planner is available when no OpenAI key is set.
 - Provider dashboard with API call, revenue, success-rate, and fee-split
   metrics.
@@ -26,10 +27,10 @@ provider dashboards.
   settlement, provider results, and receipt links.
 - Managed credits for teams that prefer API-key usage after recording USDC
   top-ups.
-- x402-protected product call route for Morph Hoodi settlement through the
+- x402-protected product call route for settlement through the
   configured facilitator.
 - Public proof pages for autonomous runs with receipt rollups, proof hashes, and
-  Morph explorer links.
+  explorer links.
 - Generic external HTTP adapter for provider-created APIs, including private
   upstream auth, async job polling, and result-path extraction behind the same
   paid gateway contract.
@@ -59,9 +60,12 @@ pnpm convex:dev
 pnpm convex:deploy
 ```
 
-## Morph
+## EVM Chain
 
-Paykubo targets Morph Hoodi for USDC-paid API commerce:
+Paykubo defaults to Morph Hoodi for USDC-paid API commerce. To migrate to
+another EVM network, update the `NEXT_PUBLIC_EVM_*`,
+`NEXT_PUBLIC_PAYMENT_TOKEN_*`, `NEXT_PUBLIC_X402_NETWORK`, and
+`X402_FACILITATOR_*` values, then redeploy the contracts on that target chain.
 
 - Chain ID: `2910`
 - CAIP-2 network: `eip155:2910`
@@ -70,7 +74,7 @@ Paykubo targets Morph Hoodi for USDC-paid API commerce:
 - Native gas currency: `ETH`
 - x402 facilitator: `https://morph-rails-hoodi.morph.network/x402/v2`
 
-### Morph Hoodi Contracts
+### Current Contracts
 
 - SubscriptionManager: `0x9a667b845034dDf18B7a5a9b50e2fe8CD4e6e2C1`
 - AgentRunAttestor: `0x761D0dbB45654513AdF1BF6b5D217C0f8B3c5737`
@@ -86,7 +90,8 @@ SDK in their own backend, CLI, or agent and call the hosted Paykubo product
 endpoint.
 
 After publishing a provider product, set `AGENT_SPENDER_PRIVATE_KEY` or
-`EVM_PRIVATE_KEY` to a Morph-funded USDC wallet and run the hosted product slug:
+`EVM_PRIVATE_KEY` to a wallet funded with the configured payment token and run
+the hosted product slug:
 
 ```bash
 pnpm x402:call media-launch-job-api
@@ -123,11 +128,17 @@ Key values:
 
 - `NEXT_PUBLIC_WALLET_PROVIDER=rainbowkit`
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
-- `NEXT_PUBLIC_MORPH_HOODI_CHAIN_ID=2910`
+- `NEXT_PUBLIC_EVM_CHAIN_ID=2910`
+- `NEXT_PUBLIC_EVM_RPC_URL=https://rpc-hoodi.morph.network`
+- `NEXT_PUBLIC_EVM_EXPLORER_URL=https://explorer-hoodi.morph.network`
 - `NEXT_PUBLIC_X402_NETWORK=eip155:2910`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_ADDRESS`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_NAME`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_VERSION`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS`
 - `X402_FACILITATOR_URL=https://morph-rails-hoodi.morph.network/x402/v2`
-- `MORPH_X402_ACCESS_KEY`
-- `MORPH_X402_SECRET_KEY`
+- `X402_FACILITATOR_ACCESS_KEY`
+- `X402_FACILITATOR_SECRET_KEY`
 - `AGENT_SPENDER_PRIVATE_KEY`
 - `AGENT_ATTESTER_PRIVATE_KEY`
 - `AGENT_LLM_API_KEY`
@@ -143,8 +154,10 @@ Key values:
 4. Attest the completed run and open `/proofs/[proofId]`.
 5. For OpenAI-planned agent runs, set `AGENT_LLM_API_KEY` and optionally
    `AGENT_LLM_MODEL`; otherwise the run is labeled as deterministic fallback.
-6. For x402 settlement, fund `AGENT_SPENDER_PRIVATE_KEY` with USDC and set
-   `NEXT_PUBLIC_APP_URL` to the deployed app URL.
+6. For x402 settlement, fund the agent run vault from the browser wallet and
+   set `NEXT_PUBLIC_APP_URL` to the deployed app URL. The agent spender signs
+   payments and only needs native gas for Permit2 or refund-return
+   transactions.
 
 ## Core Commands
 

@@ -28,7 +28,7 @@ export const agentRunStatusDetails: Record<AgentRunStatus, string> = {
   failed:
     'The agent could not complete one or more required paid actions within the selected configuration.',
   attesting:
-    'The proof hash is being written to the configured Morph attestor contract.',
+    'The proof hash is being written to the configured attestor contract.',
   attested:
-    'The proof hash has a Morph transaction and can be audited from the public proof page.'
+    'The proof hash has an on-chain transaction and can be audited from the public proof page.'
 }

@@ -20,7 +20,7 @@ export const agentRunAttestorAbi = parseAbi([
   'event AgentRunAttested(bytes32 indexed runId, address indexed ownerWallet, bytes32 proofHash, string proofUri)'
 ])
 
-export async function attestAgentRunOnMorph(
+export async function attestAgentRunOnChain(
   run: AgentRun,
   proof: Omit<AgentProof, 'txHash' | 'explorerUrl'>
 ) {
@@ -37,8 +37,8 @@ export async function attestAgentRunOnMorph(
   const account = privateKeyToAccount(privateKey as Hex)
   const walletClient = createWalletClient({
     account,
-    chain: appChains.morphHoodi.viemChain,
-    transport: http(appChains.morphHoodi.viemChain.rpcUrls.default.http[0])
+    chain: appChains.app.viemChain,
+    transport: http(appChains.app.viemChain.rpcUrls.default.http[0])
   })
 
   const txHash = await walletClient.writeContract({
@@ -55,7 +55,7 @@ export async function attestAgentRunOnMorph(
 
   return {
     txHash,
-    explorerUrl: getExplorerTransactionUrl(txHash, appChains.morphHoodi.id)
+    explorerUrl: getExplorerTransactionUrl(txHash, appChains.app.id)
   }
 }
 

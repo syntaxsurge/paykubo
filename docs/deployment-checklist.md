@@ -12,21 +12,28 @@ Use this checklist before operating the app.
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
 - `NEXT_PUBLIC_ADMIN_WALLET_ADDRESSES` as one or more comma-separated admin
   wallets. Default public data APIs are owned by the first admin wallet.
-- `NEXT_PUBLIC_MORPH_HOODI_CHAIN_ID=2910`
-- `NEXT_PUBLIC_MORPH_HOODI_RPC_URL=https://rpc-hoodi.morph.network`
-- `NEXT_PUBLIC_MORPH_HOODI_EXPLORER_URL=https://explorer-hoodi.morph.network`
+- `NEXT_PUBLIC_EVM_CHAIN_ID=2910`
+- `NEXT_PUBLIC_EVM_CHAIN_NAME=Morph Hoodi Testnet`
+- `NEXT_PUBLIC_EVM_CHAIN_SHORT_NAME=Morph Hoodi`
+- `NEXT_PUBLIC_EVM_RPC_URL=https://rpc-hoodi.morph.network`
+- `NEXT_PUBLIC_EVM_EXPLORER_URL=https://explorer-hoodi.morph.network`
+- `NEXT_PUBLIC_EVM_NATIVE_CURRENCY_SYMBOL=ETH`
+- `NEXT_PUBLIC_EVM_IS_TESTNET=true`
 - `NEXT_PUBLIC_X402_NETWORK=eip155:2910`
 - `X402_FACILITATOR_URL=https://morph-rails-hoodi.morph.network/x402/v2`
-- `MORPH_X402_ACCESS_KEY` for Morph x402 `/verify` and `/settle` HMAC auth
-- `MORPH_X402_SECRET_KEY` for Morph x402 `/verify` and `/settle` HMAC signing
+- `X402_FACILITATOR_ACCESS_KEY` for x402 `/verify` and `/settle` HMAC auth
+- `X402_FACILITATOR_SECRET_KEY` for x402 `/verify` and `/settle` HMAC signing
 - `AGENT_SPENDER_PRIVATE_KEY`
 - `AGENT_ATTESTER_PRIVATE_KEY`
 - `NEXT_PUBLIC_AGENT_ATTESTOR_ADDRESS`
 - `NEXT_PUBLIC_AGENT_RUN_VAULT_ADDRESS`
 - `AGENT_RUN_VAULT_OPERATOR_PRIVATE_KEY`
-- `NEXT_PUBLIC_USDC_TOKEN_ADDRESS`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_ADDRESS`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_NAME`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_VERSION`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS`
 
-## Morph Hoodi Contract Addresses
+## Current Contract Addresses
 
 - `NEXT_PUBLIC_SUBSCRIPTION_MANAGER_ADDRESS=0x9a667b845034dDf18B7a5a9b50e2fe8CD4e6e2C1`
 - `NEXT_PUBLIC_AGENT_ATTESTOR_ADDRESS=0x761D0dbB45654513AdF1BF6b5D217C0f8B3c5737`
@@ -58,7 +65,7 @@ pnpm build
   for a run.
 - `POST /api/agents/runs/[runId]/refund` records unused agent budget refunds
   after terminal states.
-- `POST /api/agents/runs/[runId]/attest` returns a proof with a Morph explorer
+- `POST /api/agents/runs/[runId]/attest` returns a proof with an explorer
   link.
 - `GET /api/proofs/[proofId]` returns the public proof package.
 - `POST /api/x402/products/{published-product-slug}/call` without `X-PAYMENT`

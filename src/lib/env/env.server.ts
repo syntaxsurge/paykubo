@@ -13,8 +13,8 @@ const optionalUrl = z.preprocess(
 const serverSchema = z.object({
   CONVEX_DEPLOYMENT: optionalString,
   X402_FACILITATOR_URL: optionalUrl,
-  MORPH_X402_ACCESS_KEY: optionalString,
-  MORPH_X402_SECRET_KEY: optionalString,
+  X402_FACILITATOR_ACCESS_KEY: optionalString,
+  X402_FACILITATOR_SECRET_KEY: optionalString,
   NEXT_PUBLIC_API_PAYMENT_ESCROW_ADDRESS: optionalString,
   AGENT_SPENDER_PRIVATE_KEY: optionalString,
   AGENT_ATTESTER_PRIVATE_KEY: optionalString,
@@ -28,8 +28,8 @@ const serverSchema = z.object({
 export const envServer = serverSchema.parse({
   CONVEX_DEPLOYMENT: process.env.CONVEX_DEPLOYMENT,
   X402_FACILITATOR_URL: process.env.X402_FACILITATOR_URL,
-  MORPH_X402_ACCESS_KEY: process.env.MORPH_X402_ACCESS_KEY,
-  MORPH_X402_SECRET_KEY: process.env.MORPH_X402_SECRET_KEY,
+  X402_FACILITATOR_ACCESS_KEY: process.env.X402_FACILITATOR_ACCESS_KEY,
+  X402_FACILITATOR_SECRET_KEY: process.env.X402_FACILITATOR_SECRET_KEY,
   NEXT_PUBLIC_API_PAYMENT_ESCROW_ADDRESS:
     process.env.NEXT_PUBLIC_API_PAYMENT_ESCROW_ADDRESS,
   AGENT_SPENDER_PRIVATE_KEY: process.env.AGENT_SPENDER_PRIVATE_KEY,

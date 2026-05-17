@@ -48,8 +48,8 @@ export function AgentRunList({ runs: initialRuns }: { runs: AgentRun[] }) {
       <div className='border-foreground/10 bg-muted/30 rounded-lg border p-5 text-sm'>
         <p className='font-semibold'>No runs yet</p>
         <p className='text-foreground/65 mt-1'>
-          Create a run to test OpenAI planning, x402 settlement, and Morph proof
-          output.
+          Create a run to test OpenAI planning, x402 settlement, and on-chain
+          proof output.
         </p>
       </div>
     )

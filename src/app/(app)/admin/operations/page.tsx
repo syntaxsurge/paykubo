@@ -23,7 +23,7 @@ const deploymentSteps = [
   'Set NEXT_PUBLIC_X402_NETWORK and X402_FACILITATOR_URL for USDC-paid API calls; provider fee splits are resolved from subscription tiers.',
   'Set AGENT_SPENDER_PRIVATE_KEY, AGENT_ATTESTER_PRIVATE_KEY, and NEXT_PUBLIC_AGENT_ATTESTOR_ADDRESS for production agent runs.',
   'Run pnpm typecheck and pnpm build before deployment.',
-  'Deploy the Next.js app with the same Morph and x402 values used for the verified local build.',
+  'Deploy the Next.js app with the same EVM chain and x402 values used for the verified local build.',
   'Confirm /api/health, /api/openapi.json, /api/reference, /agents, /proofs/[proofId], and an unpaid x402 product call return expected responses.'
 ]
 

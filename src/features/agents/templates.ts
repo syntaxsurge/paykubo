@@ -33,7 +33,7 @@ export const agentTemplates: AgentTemplate[] = [
       'Researches developer signals, writes launch copy, and prepares an auditable proof package.',
     objective: 'Create a launch pack for my USDC-native paid API product.',
     sourceText:
-      'The product sells premium API responses to AI agents and records USDC receipts on Morph.',
+      'The product sells premium API responses to AI agents and records USDC receipts on-chain.',
     recommendedBudgetUsdc: 0.9,
     maxPaidActions: 4,
     toolStrategy:

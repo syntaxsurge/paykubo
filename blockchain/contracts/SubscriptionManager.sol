@@ -5,7 +5,7 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 /// @title SubscriptionManager
-/// @notice Accepts Morph Hoodi native-token payments to activate, renew, or cancel a team's subscription.
+/// @notice Accepts native-token payments to activate, renew, or cancel a team's subscription.
 contract SubscriptionManager is AccessControl {
   /* -------------------------------------------------------------------------- */
   /*                                  TYPES                                     */

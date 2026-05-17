@@ -9,18 +9,18 @@ import type {
   VerifyResponse
 } from '@x402/core/types'
 
-type MorphFacilitatorClientOptions = {
+type HmacFacilitatorClientOptions = {
   url: string
   accessKey?: string
   secretKey?: string
 }
 
-export class MorphFacilitatorClient implements FacilitatorClient {
+export class HmacFacilitatorClient implements FacilitatorClient {
   readonly url: string
   private readonly accessKey?: string
   private readonly secretKey?: string
 
-  constructor({ url, accessKey, secretKey }: MorphFacilitatorClientOptions) {
+  constructor({ url, accessKey, secretKey }: HmacFacilitatorClientOptions) {
     this.url = url.replace(/\/+$/, '')
     this.accessKey = accessKey
     this.secretKey = secretKey
@@ -136,7 +136,7 @@ async function parseFacilitatorResponse<T>(response: Response, label: string) {
 
   if (!response.ok) {
     throw new Error(
-      `Morph x402 ${label} failed (${response.status}): ${text.slice(0, 500)}`
+      `x402 facilitator ${label} failed (${response.status}): ${text.slice(0, 500)}`
     )
   }
 

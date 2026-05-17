@@ -7,14 +7,15 @@ providing deployment shortcuts.
 
 - `blockchain/contracts/SubscriptionManager.sol` - the on-chain subscription
   contract supported by Paykubo.
-- `blockchain/contracts/AgentRunAttestor.sol` - the Morph proof hash attestor
+- `blockchain/contracts/AgentRunAttestor.sol` - the proof hash attestor
   for autonomous agent runs.
 - `blockchain/contracts/ApiPaymentEscrow.sol` - escrow for prepaid
   credit-metered API calls that must be released or refunded after provider
   completion.
 - `blockchain/contracts/AgentRunVault.sol` - user-funded USDC budget vault for
   autonomous agent runs.
-- `blockchain/hardhat.config.ts` - Hardhat configuration for Morph Hoodi.
+- `blockchain/hardhat.config.ts` - Hardhat configuration for the configured
+  EVM deployment target.
 - `blockchain/scripts/deploySubscriptionManager.ts` - deployment script that
   writes the deployed address to `blockchain/deployment.log`.
 - `blockchain/scripts/deployAgentRunAttestor.ts` - deployment script that

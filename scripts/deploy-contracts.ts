@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename)
 const rootDir = path.resolve(__dirname, '..')
 const blockchainDir = path.join(rootDir, 'blockchain')
 
-const network = process.argv[2]?.trim() || process.env.NETWORK || 'morphHoodi'
+const network = process.argv[2]?.trim() || process.env.NETWORK || 'appChain'
 
 const scriptPath = path.join(
   blockchainDir,

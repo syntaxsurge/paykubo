@@ -78,7 +78,7 @@ import { privateKeyToAccount } from "viem/accounts";
 const privateKey = process.env.EVM_PRIVATE_KEY;
 
 if (!privateKey) {
-  throw new Error("Set EVM_PRIVATE_KEY to a Morph USDC-funded wallet.");
+  throw new Error("Set EVM_PRIVATE_KEY to a wallet funded with the configured payment token.");
 }
 
 const signer = privateKeyToAccount(privateKey);

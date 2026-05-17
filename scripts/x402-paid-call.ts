@@ -19,8 +19,8 @@ import { privateKeyToAccount } from 'viem/accounts'
 
 import {
   defaultAppChain,
-  morphUsdcTokenAddress,
-  morphUsdcTokenDecimals
+  paymentTokenAddress,
+  paymentTokenDecimals
 } from '../src/lib/config/chains'
 
 config({ path: '.env.local' })
@@ -75,15 +75,15 @@ const usdcBalanceAbi = parseAbi([
 async function ensurePermit2Allowance(amountUsd: number) {
   const account = privateKeyToAccount(getPrivateKey() as Hex)
   const requiredAmount = parseUnits(
-    amountUsd.toFixed(Math.min(morphUsdcTokenDecimals, 6)),
-    morphUsdcTokenDecimals
+    amountUsd.toFixed(Math.min(paymentTokenDecimals, 6)),
+    paymentTokenDecimals
   )
 
   if (requiredAmount <= 0n) {
     return
   }
 
-  const tokenAddress = morphUsdcTokenAddress as Address
+  const tokenAddress = paymentTokenAddress as Address
   const [balance, allowance] = await Promise.all([
     publicClient.readContract({
       address: tokenAddress,
@@ -168,7 +168,7 @@ async function waitForPermit2Allowance({
 }
 
 function formatUsdcAmount(amount: bigint) {
-  return `${Number(formatUnits(amount, morphUsdcTokenDecimals)).toLocaleString(
+  return `${Number(formatUnits(amount, paymentTokenDecimals)).toLocaleString(
     undefined,
     {
       maximumFractionDigits: 6

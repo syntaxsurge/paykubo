@@ -278,7 +278,7 @@ async function settleClaim({
         reason: settlement.errorReason,
         message: settlement.errorMessage,
         guidance:
-          'Confirm the buyer wallet has enough USDC and ETH gas on Morph Hoodi, then try again.'
+          'Confirm the buyer wallet has enough USDC and native gas on the configured network, then try again.'
       },
       {
         status: settlement.response.status,

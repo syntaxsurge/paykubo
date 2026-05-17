@@ -3,7 +3,7 @@ import { defineChain, parseUnits } from 'viem'
 
 import { envClient } from '@/lib/env/env.client'
 
-export type SupportedChainKey = 'morphHoodi'
+export type SupportedChainKey = 'app'
 
 export type AppChain = {
   key: SupportedChainKey
@@ -18,79 +18,85 @@ export type AppChain = {
   }
 }
 
+const appChainId = envClient.NEXT_PUBLIC_EVM_CHAIN_ID ?? 2910
+const appChainName =
+  envClient.NEXT_PUBLIC_EVM_CHAIN_NAME ?? 'Morph Hoodi Testnet'
+const appChainShortName =
+  envClient.NEXT_PUBLIC_EVM_CHAIN_SHORT_NAME ?? 'Morph Hoodi'
+const appChainRpcUrl =
+  envClient.NEXT_PUBLIC_EVM_RPC_URL ?? 'https://rpc-hoodi.morph.network'
+const appChainExplorerName =
+  envClient.NEXT_PUBLIC_EVM_EXPLORER_NAME ?? 'Morph Hoodi Explorer'
+const appChainExplorerUrl =
+  envClient.NEXT_PUBLIC_EVM_EXPLORER_URL ??
+  'https://explorer-hoodi.morph.network'
+const appChainNativeCurrency = {
+  name: envClient.NEXT_PUBLIC_EVM_NATIVE_CURRENCY_NAME ?? 'Ether',
+  symbol: envClient.NEXT_PUBLIC_EVM_NATIVE_CURRENCY_SYMBOL ?? 'ETH',
+  decimals: envClient.NEXT_PUBLIC_EVM_NATIVE_CURRENCY_DECIMALS ?? 18
+}
+
 export const appChains = {
-  morphHoodi: {
-    key: 'morphHoodi',
-    id: envClient.NEXT_PUBLIC_MORPH_HOODI_CHAIN_ID ?? 2910,
-    name: 'Morph Hoodi Testnet',
-    shortName: 'Morph Hoodi',
-    nativeCurrency: {
-      name: 'Ether',
-      symbol: 'ETH',
-      decimals: 18
-    },
+  app: {
+    key: 'app',
+    id: appChainId,
+    name: appChainName,
+    shortName: appChainShortName,
+    nativeCurrency: appChainNativeCurrency,
     viemChain: defineChain({
-      id: envClient.NEXT_PUBLIC_MORPH_HOODI_CHAIN_ID ?? 2910,
-      name: 'Morph Hoodi Testnet',
-      nativeCurrency: {
-        name: 'Ether',
-        symbol: 'ETH',
-        decimals: 18
-      },
+      id: appChainId,
+      name: appChainName,
+      nativeCurrency: appChainNativeCurrency,
       rpcUrls: {
         default: {
-          http: [
-            envClient.NEXT_PUBLIC_MORPH_HOODI_RPC_URL ??
-              'https://rpc-hoodi.morph.network'
-          ]
+          http: [appChainRpcUrl]
         }
       },
       blockExplorers: {
         default: {
-          name: 'Morph Hoodi Explorer',
-          url:
-            envClient.NEXT_PUBLIC_MORPH_HOODI_EXPLORER_URL ??
-            'https://explorer-hoodi.morph.network'
+          name: appChainExplorerName,
+          url: appChainExplorerUrl
         }
       },
-      testnet: true
+      testnet: envClient.NEXT_PUBLIC_EVM_IS_TESTNET ?? true
     }),
     explorer: {
-      name: 'Morph Hoodi Explorer',
-      baseUrl:
-        envClient.NEXT_PUBLIC_MORPH_HOODI_EXPLORER_URL ??
-        'https://explorer-hoodi.morph.network'
+      name: appChainExplorerName,
+      baseUrl: appChainExplorerUrl
     }
   }
 } as const satisfies Record<SupportedChainKey, AppChain>
 
 export const supportedAppChains = Object.values(appChains)
-export const supportedViemChains = [appChains.morphHoodi.viemChain] as const
-export const defaultAppChain = appChains.morphHoodi
-export const x402Network = envClient.NEXT_PUBLIC_X402_NETWORK ?? 'eip155:2910'
-const defaultMorphHoodiTokenAddress =
-  '0x7433b41C6c5e1d58D4Da99483609520255ab661B'
-const defaultMorphHoodiTokenDomainName = 'USDC'
-export const morphUsdcTokenAddress =
-  envClient.NEXT_PUBLIC_USDC_TOKEN_ADDRESS ?? defaultMorphHoodiTokenAddress
-const configuredMorphUsdcTokenName = envClient.NEXT_PUBLIC_USDC_TOKEN_NAME
-export const morphUsdcTokenName =
-  configuredMorphUsdcTokenName ?? defaultMorphHoodiTokenDomainName
-export const morphUsdcTokenVersion =
-  envClient.NEXT_PUBLIC_USDC_TOKEN_VERSION ?? '2'
-export const morphUsdcTokenDecimals =
-  envClient.NEXT_PUBLIC_USDC_TOKEN_DECIMALS ?? 6
+export const supportedViemChains = [appChains.app.viemChain] as const
+export const defaultAppChain = appChains.app
+export const x402Network =
+  envClient.NEXT_PUBLIC_X402_NETWORK ?? `eip155:${defaultAppChain.id}`
+export const defaultX402FacilitatorUrl =
+  'https://morph-rails-hoodi.morph.network/x402/v2'
+const defaultPaymentTokenAddress = '0x7433b41C6c5e1d58D4Da99483609520255ab661B'
+const defaultPaymentTokenDomainName = 'USDC'
+export const paymentTokenAddress =
+  envClient.NEXT_PUBLIC_PAYMENT_TOKEN_ADDRESS ?? defaultPaymentTokenAddress
+export const paymentTokenName =
+  envClient.NEXT_PUBLIC_PAYMENT_TOKEN_NAME ?? defaultPaymentTokenDomainName
+export const paymentTokenSymbol =
+  envClient.NEXT_PUBLIC_PAYMENT_TOKEN_SYMBOL ?? 'USDC'
+export const paymentTokenVersion =
+  envClient.NEXT_PUBLIC_PAYMENT_TOKEN_VERSION ?? '2'
+export const paymentTokenDecimals =
+  envClient.NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS ?? 6
 
-export function toUsdcAssetAmount(amountUsd: number) {
+export function toPaymentAssetAmount(amountUsd: number) {
   return {
     amount: parseUnits(
-      amountUsd.toFixed(Math.min(morphUsdcTokenDecimals, 6)),
-      morphUsdcTokenDecimals
+      amountUsd.toFixed(Math.min(paymentTokenDecimals, 6)),
+      paymentTokenDecimals
     ).toString(),
-    asset: morphUsdcTokenAddress,
+    asset: paymentTokenAddress,
     extra: {
-      name: morphUsdcTokenName,
-      version: morphUsdcTokenVersion
+      name: paymentTokenName,
+      version: paymentTokenVersion
     }
   }
 }

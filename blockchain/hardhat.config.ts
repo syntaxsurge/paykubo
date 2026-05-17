@@ -8,7 +8,8 @@ require("dotenv").config();
 /* -------------------------------------------------------------------------- */
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY ?? "";
-const MORPH_HOODI_RPC_URL = process.env.MORPH_HOODI_RPC_URL ?? "https://rpc-hoodi.morph.network";
+const EVM_RPC_URL = process.env.EVM_RPC_URL ?? "https://rpc-hoodi.morph.network";
+const EVM_CHAIN_ID = Number(process.env.EVM_CHAIN_ID ?? 2910);
 const accounts = PRIVATE_KEY ? [PRIVATE_KEY] : [];
 
 /* -------------------------------------------------------------------------- */
@@ -24,9 +25,9 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-    morphHoodi: {
-      url: MORPH_HOODI_RPC_URL,
-      chainId: 2910,
+    appChain: {
+      url: EVM_RPC_URL,
+      chainId: EVM_CHAIN_ID,
       accounts,
     },
   },

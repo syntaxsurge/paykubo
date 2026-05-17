@@ -50,7 +50,7 @@ import { useAutoPolling } from '@/hooks/use-auto-polling'
 import {
   defaultAppChain,
   getExplorerTransactionUrl,
-  morphUsdcTokenDecimals
+  paymentTokenDecimals
 } from '@/lib/config/chains'
 import { walletProvider } from '@/lib/config/wallet'
 import { cn } from '@/lib/utils/cn'
@@ -161,7 +161,7 @@ const asyncJobTerminalStatuses = new Set<MarketplaceOrder['status']>([
   'delta_payment_required'
 ])
 
-const morphPublicClient = createPublicClient({
+const paymentChainPublicClient = createPublicClient({
   chain: defaultAppChain.viemChain,
   transport: http(defaultAppChain.viemChain.rpcUrls.default.http[0])
 })
@@ -637,7 +637,7 @@ function OrderStatusContent({
       updateWalletStep('settlement', {
         status: 'complete',
         detail: settlementTxHash
-          ? 'USDC settled on Morph Hoodi.'
+          ? 'USDC settled on the configured network.'
           : 'USDC settled and Paykubo received the paid response.',
         txHash: isHexTransactionHash(settlementTxHash)
           ? settlementTxHash
@@ -696,7 +696,7 @@ function OrderStatusContent({
               body.error ||
               'Payment settled, but the provider request failed.'
             : settlementTxHash
-              ? `USDC payment settled on Morph. Transaction: ${settlementTxHash}`
+              ? `USDC payment settled on-chain. Transaction: ${settlementTxHash}`
               : 'USDC payment settled and provider response returned.'
       )
       setPaymentError(
@@ -989,7 +989,7 @@ function OrderStatusContent({
       setOrder(nextOrder)
       setStatus(
         receipt?.txHash
-          ? `Metered delta settled on Morph. Transaction: ${receipt.txHash}`
+          ? `Metered delta settled on-chain. Transaction: ${receipt.txHash}`
           : 'Metered delta settled and the provider result is released.'
       )
     } catch (caughtError) {
@@ -1038,7 +1038,7 @@ function OrderStatusContent({
               <div className='flex flex-wrap gap-2 sm:justify-end'>
                 <Badge className='w-fit'>x402</Badge>
                 <Badge className='w-fit'>USDC</Badge>
-                <Badge className='w-fit'>Morph</Badge>
+                <Badge className='w-fit'>Network</Badge>
               </div>
               <div className='flex flex-wrap gap-2 sm:justify-end'>
                 <Button
@@ -1585,7 +1585,7 @@ function SettlementLinks({ order }: { order: MarketplaceOrder }) {
       {order.explorerUrl ? (
         <div className='border-foreground/10 rounded-lg border p-4'>
           <p className='text-foreground/60 text-xs uppercase'>
-            Morph transaction
+            Network transaction
           </p>
           <a
             className='text-primary mt-1 inline-flex max-w-full items-center gap-1 font-semibold break-all underline-offset-4 hover:underline'
@@ -1899,8 +1899,8 @@ function buildPaidRequestError(
     paymentRequired?.error === 'permit2_allowance_required'
   ) {
     return [
-      'Morph USDC settlement still needs Permit2 allowance or sufficient wallet funds.',
-      'Approve the USDC allowance when prompted, then confirm the wallet has enough USDC and ETH gas on Morph Hoodi.'
+      'USDC settlement still needs Permit2 allowance or sufficient wallet funds.',
+      `Approve the USDC allowance when prompted, then confirm the wallet has enough USDC and ${defaultAppChain.nativeCurrency.symbol} gas on ${defaultAppChain.shortName}.`
     ].join(' ')
   }
 
@@ -2275,18 +2275,18 @@ async function ensurePermit2Allowance(
     return
   }
 
-  onStatus('Checking USDC Permit2 allowance on Morph Hoodi.')
+  onStatus(`Checking USDC Permit2 allowance on ${defaultAppChain.shortName}.`)
 
   const [balance, allowance] = await withTransientRetries(
     () =>
       Promise.all([
-        morphPublicClient.readContract({
+        paymentChainPublicClient.readContract({
           address: tokenAddress,
           abi: usdcBalanceAbi,
           functionName: 'balanceOf',
           args: [walletControls.signer.address]
         }),
-        morphPublicClient.readContract(
+        paymentChainPublicClient.readContract(
           getPermit2AllowanceReadParams({
             tokenAddress,
             ownerAddress: walletControls.signer.address
@@ -2307,7 +2307,7 @@ async function ensurePermit2Allowance(
         requiredAmount
       )} USDC, but the connected wallet has ${formatUsdcAmount(
         balance
-      )} USDC on Morph Hoodi.`
+      )} USDC on ${defaultAppChain.shortName}.`
     )
   }
 
@@ -2343,7 +2343,7 @@ async function ensurePermit2Allowance(
 
   const receipt = await withTransientRetries(
     () =>
-      morphPublicClient.waitForTransactionReceipt({
+      paymentChainPublicClient.waitForTransactionReceipt({
         hash: transactionHash
       }),
     {
@@ -2373,7 +2373,7 @@ async function ensurePermit2Allowance(
 
   onStep('allowance', {
     status: 'complete',
-    detail: 'USDC Permit2 approval confirmed on Morph.',
+    detail: 'USDC Permit2 approval confirmed on-chain.',
     txHash: transactionHash
   })
 }
@@ -2388,7 +2388,7 @@ async function waitForPermit2Allowance({
   requiredAmount: bigint
 }) {
   for (let attempt = 0; attempt < 10; attempt += 1) {
-    const allowance = await morphPublicClient.readContract(
+    const allowance = await paymentChainPublicClient.readContract(
       getPermit2AllowanceReadParams({
         tokenAddress,
         ownerAddress
@@ -2448,7 +2448,7 @@ function shortenHash(value: string) {
 }
 
 function formatUsdcAmount(amount: bigint) {
-  return Number(formatUnits(amount, morphUsdcTokenDecimals)).toLocaleString(
+  return Number(formatUnits(amount, paymentTokenDecimals)).toLocaleString(
     undefined,
     {
       maximumFractionDigits: 6

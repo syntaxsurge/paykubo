@@ -192,9 +192,9 @@ function ManagedCreditsPanelContent({
         />
         <Input
           name='settlementTxHash'
-          placeholder='0x... Morph USDC top-up transaction hash'
+          placeholder='0x... payment-token top-up transaction hash'
           required
-          aria-label='Morph top-up transaction hash'
+          aria-label='payment-token top-up transaction hash'
         />
         <Button type='submit' disabled={isLoading || !address}>
           Record top-up

@@ -102,8 +102,8 @@ explicitly told otherwise:
   - `blockchain/.env` for Hardhat deployment secrets, with
     `blockchain/.env.example` as a template.
 - Use **Convex** as the off-chain backend stack.
-- Support a **Hardhat blockchain workspace** under `blockchain/` with a Morph
-  Testnet `SubscriptionManager.sol` as the canonical Solidity contract and
+- Support a **Hardhat blockchain workspace** under `blockchain/` with a
+  configured EVM-network `SubscriptionManager.sol` as the canonical Solidity contract and
   frontend subscription helpers in `src/lib/contracts/`.
 - Keep **caching explicit** in Next.js 15:
   - `GET` Route Handlers are **not cached by default**.
@@ -393,7 +393,8 @@ Before creating a new helper or service file:
   cookies used by protected app routes and return the connected wallet's Convex
   user profile when available; successful browser wallet connections redirect
   public-page users to `/dashboard` after the session is synced.
-- `GET /api/health` — returns Paykubo readiness checks for Morph, x402, wallet
+- `GET /api/health` — returns Paykubo readiness checks for the configured EVM
+  network, x402, wallet
   onboarding, external API forwarding, marketplace listings, and receipts.
 - `POST /api/webhooks` — records inbound webhook events to Convex with source,
   event type, sanitized headers, raw payload text, and parsed JSON payload when
@@ -482,7 +483,7 @@ Before creating a new helper or service file:
   preparing the agent signer's USDC Permit2 allowance when required, and
   returning detailed payment or provider failures for action diagnostics.
 - `POST /api/agents/runs/[runId]/attest` — hashes completed run metadata and
-  writes the proof to the configured Morph AgentRunAttestor when available.
+  writes the proof to the configured AgentRunAttestor when available.
 - `GET /api/proofs/[proofId]` — returns a public proof package for a completed
   autonomous agent run.
 - `GET /api/x402/products/[slug]/call` and `POST /api/x402/products/[slug]/call`
@@ -520,9 +521,9 @@ Before creating a new helper or service file:
   saved examples, and reviews; client helper in `src/lib/db/convex/client.ts`.
 - Hardhat blockchain workspace in `blockchain/` with
   `contracts/SubscriptionManager.sol` plus `contracts/AgentRunAttestor.sol` for
-  Morph proof hashes and `contracts/ApiPaymentEscrow.sol` for prepaid
+  on-chain proof hashes and `contracts/ApiPaymentEscrow.sol` for prepaid
   credit-metered API payments plus `contracts/AgentRunVault.sol` for user-funded
-  autonomous agent budgets. Morph Hoodi contract addresses are
+  autonomous agent budgets. Current contract addresses are
   `NEXT_PUBLIC_SUBSCRIPTION_MANAGER_ADDRESS=0x9a667b845034dDf18B7a5a9b50e2fe8CD4e6e2C1`,
   `NEXT_PUBLIC_AGENT_ATTESTOR_ADDRESS=0x761D0dbB45654513AdF1BF6b5D217C0f8B3c5737`,
   `NEXT_PUBLIC_API_PAYMENT_ESCROW_ADDRESS=0x27E9062ee91A0D60De39984346cAeD53bE68024c`,
@@ -623,7 +624,7 @@ Before creating a new helper or service file:
   fund the `AgentRunVault` with USDC before the configured agent signer can
   execute x402 paid actions. The run detail client funds through the browser
   EIP-1193 wallet provider, requests the MetaMask account when needed, switches
-  or adds Morph Hoodi, checks the connected wallet's settlement-token balance
+  or adds the configured EVM network, checks the connected wallet's settlement-token balance
   and vault allowance, submits the USDC approval when needed, verifies receipt
   success, then submits `fundRun` and verifies the funding receipt before
   confirming the run server-side.
@@ -650,14 +651,13 @@ Before creating a new helper or service file:
   a terminal result, refund state, or completed project URL. Agent-paid x402
   calls include the agent run ID in gateway order and receipt records so
   provider dashboards and usage pages count autonomous tool calls in the same
-  revenue ledger as browser and developer API calls. Morph Hoodi x402 payment
-  requirements use the settlement token's EIP-712 domain metadata in
-  `NEXT_PUBLIC_USDC_TOKEN_NAME`, `NEXT_PUBLIC_USDC_TOKEN_VERSION`, and
-  `NEXT_PUBLIC_USDC_TOKEN_DECIMALS`; the Morph Hoodi settlement token is USDC at
-  `0x7433b41C6c5e1d58D4Da99483609520255ab661B` with EIP-712 version `2` and 6
-  decimals. Signed x402 payloads, Permit2 checks, agent vault funding, and
-  escrow reserves must use that token metadata for facilitator verification and
-  settlement. Vault spend and refund writes wait for successful transaction
+  revenue ledger as browser and developer API calls. x402 payment requirements
+  use the settlement token's EIP-712 domain metadata in
+  `NEXT_PUBLIC_PAYMENT_TOKEN_NAME`, `NEXT_PUBLIC_PAYMENT_TOKEN_VERSION`, and
+  `NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS`; the configured settlement token address
+  comes from `NEXT_PUBLIC_PAYMENT_TOKEN_ADDRESS`. Signed x402 payloads, Permit2
+  checks, agent vault funding, and escrow reserves must use that token metadata
+  for facilitator verification and settlement. Vault spend and refund writes wait for successful transaction
   receipts, and refund recovery reads the vault's live spent amount before
   calling `recordSpendRefund` so retries and partially recovered failures do not
   request a larger refund than the current vault state can accept. Direct
@@ -720,10 +720,10 @@ Before creating a new helper or service file:
   previews, Markdown-rendered deliverables, a final output section that renders
   detected text, image, video, and result-link deliverables at the bottom of the
   run page, unused refund controls with visible refund transaction explorer
-  links, and writes Morph proof attestations.
+  links, and writes on-chain proof attestations.
 - `/proofs/[proofId]` publicly displays non-sensitive autonomous run proof
   metadata, proof hash, receipt IDs, budget funding and refund metadata, total
-  USDC spend, attestation transaction, and Morph explorer link.
+  USDC spend, attestation transaction, and explorer link.
 - Provider adapters live in `src/features/provider-adapters`; the registry uses
   the generic external HTTP adapter for provider-created listings. The external
   HTTP adapter forwards paid requests to the configured upstream endpoint,
@@ -802,7 +802,7 @@ Before creating a new helper or service file:
   shows buyer request lifecycle state using shared order status labels and
   descriptions from `src/features/marketplace/status.ts`; order detail pages
   sign x402 USDC payments with the connected browser wallet, check and submit
-  the required Morph USDC Permit2 allowance transaction when needed, verify USDC
+  the required payment-token Permit2 allowance transaction when needed, verify USDC
   balance before asking for payment signatures, wait for the approval receipt
   and readable allowance, retry transient quote, allowance, signature,
   settlement, claim, and provider status errors with bounded exponential backoff
@@ -823,7 +823,7 @@ Before creating a new helper or service file:
   amounts for credit-metered calls, claim metered deltas through x402 before
   revealing locked results, show escrow reserve/release/refund transaction links
   when a credit-metered async payment uses escrow, and link to the settlement
-  receipt and Morph explorer transaction. Draft products stay hidden from public
+  receipt and explorer transaction. Draft products stay hidden from public
   marketplace usage but can be tested through provider management by creating
   provider-test order records; locally persisted draft listings created before
   owner metadata exists can still be tested through matching order records.
@@ -865,7 +865,7 @@ Before creating a new helper or service file:
   import, x402 paid calls, fixed-price provider contracts, credit-metered
   quote-first provider contracts, external prepaid async job metadata, public
   handoff and clone URL result contracts, final usage delta handling, autonomous
-  agent runs, Morph proof attestations, gateway forwarding, receipt records,
+  agent runs, on-chain proof attestations, gateway forwarding, receipt records,
   external HTTP adapter behavior, OpenAPI JSON, and the Scalar API reference.
   The developer docs page renders GitHub-flavored Markdown with `react-markdown`
   and `remark-gfm`, uses a sticky table of contents, and exposes stable section
@@ -877,19 +877,19 @@ Before creating a new helper or service file:
   and supports current-page selection with bulk deletion.
 - Admin user row actions use three-dot menus with reusable responsive dialogs
   for editing user details, subscription tier, and destructive confirmations.
-- Chain metadata, native currency labels, and explorer URL generation are
-  centralized in `src/lib/config/chains.ts`; Morph Hoodi is the default app
-  chain with chain ID `2910`, ETH native gas currency,
-  `https://rpc-hoodi.morph.network` RPC, and
-  `https://explorer-hoodi.morph.network` explorer.
+- Chain metadata, native currency labels, settlement-token metadata, x402
+  network ID, and explorer URL generation are centralized in
+  `src/lib/config/chains.ts`; the default app chain is configured through
+  `NEXT_PUBLIC_EVM_CHAIN_ID`, `NEXT_PUBLIC_EVM_RPC_URL`,
+  `NEXT_PUBLIC_EVM_EXPLORER_URL`, and `NEXT_PUBLIC_PAYMENT_TOKEN_*`.
 - Operational readiness checks live in `src/lib/operations/readiness.ts` and
   feed `/api/health` plus the admin operations page, including agent signer,
   attestor, and public proof readiness.
-- x402 network configuration uses the CAIP-2 identifier `eip155:2910`; the
+- x402 network configuration uses the CAIP-2 identifier in
+  `NEXT_PUBLIC_X402_NETWORK`; the
   resource server in `src/lib/x402/paykubo-resource-server.ts` registers the EVM
   `exact` scheme, uses `X402_FACILITATOR_URL`, protects product call routes, and
-  relies on the x402 stablecoin registry to resolve dollar-denominated prices to
-  USDC on Morph.
+  resolves dollar-denominated prices to the configured payment token.
 - Walkthrough and deployment documentation lives in `docs/demo-script.md` and
   `docs/deployment-checklist.md`.
 - The admin subscriptions page reads SubscriptionManager balance, plan prices,
@@ -904,9 +904,9 @@ Before creating a new helper or service file:
   RainbowKit integrations.
 - Environment parsing treats blank optional values as unset so local optional
   URL fields do not fail validation.
-- RainbowKit configuration uses the shared Morph Hoodi chain registry when
-  `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is configured, and initializes on Morph
-  Testnet.
+- RainbowKit configuration uses the shared EVM chain registry when
+  `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is configured, and initializes on the
+  configured app chain.
 - RainbowKit wallet controls live inside the shared header account menu, with
   account details, copy-address, and disconnect actions handled by the
   RainbowKit dialog.

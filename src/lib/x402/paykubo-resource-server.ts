@@ -10,14 +10,18 @@ import { registerExactEvmScheme } from '@x402/evm/exact/server'
 import { getMarketplaceOrderById } from '@/features/marketplace/orders'
 import { resolveProductPrice } from '@/features/marketplace/pricing'
 import { getProductBySlug } from '@/features/marketplace/products'
-import { toUsdcAssetAmount, x402Network } from '@/lib/config/chains'
+import {
+  defaultX402FacilitatorUrl,
+  toPaymentAssetAmount,
+  x402Network
+} from '@/lib/config/chains'
 import { getApiPaymentPayTo } from '@/lib/contracts/api-payment-escrow'
 import { envServer } from '@/lib/env/env.server'
-import { MorphFacilitatorClient } from '@/lib/x402/morph-facilitator-client'
+import { HmacFacilitatorClient } from '@/lib/x402/hmac-facilitator-client'
 
 const paidCallPattern = '/api/x402/products/:slug/call'
 const claimPattern = '/api/x402/orders/:orderId/claim'
-const morphX402MaxTimeoutSeconds = 60
+const x402MaxTimeoutSeconds = 60
 let serverPromise: Promise<x402HTTPResourceServer> | null = null
 
 function getProductSlugFromPath(path: string) {
@@ -86,12 +90,12 @@ const paidCallRoute: RouteConfig = {
         requestPayload: getRequestPayload(context)
       })
 
-      return toUsdcAssetAmount(resolvedPrice.amountUsd)
+      return toPaymentAssetAmount(resolvedPrice.amountUsd)
     },
-    maxTimeoutSeconds: morphX402MaxTimeoutSeconds
+    maxTimeoutSeconds: x402MaxTimeoutSeconds
   },
   description:
-    'USDC-settled Paykubo API call on Morph Hoodi through the x402 protocol.',
+    'Payment-token-settled Paykubo API call through the x402 protocol.',
   mimeType: 'application/json',
   unpaidResponseBody: async context => {
     const product = await requireProductFromContext(context)
@@ -124,8 +128,7 @@ const paidCallRoute: RouteConfig = {
           network: x402Network,
           scheme: 'exact',
           facilitatorUrl:
-            envServer.X402_FACILITATOR_URL ??
-            'https://morph-rails-hoodi.morph.network/x402/v2'
+            envServer.X402_FACILITATOR_URL ?? defaultX402FacilitatorUrl
         }
       }
     }
@@ -162,9 +165,9 @@ const claimRoute: RouteConfig = {
         throw new Error('Order does not have a payable metered delta.')
       }
 
-      return toUsdcAssetAmount(amount)
+      return toPaymentAssetAmount(amount)
     },
-    maxTimeoutSeconds: morphX402MaxTimeoutSeconds
+    maxTimeoutSeconds: x402MaxTimeoutSeconds
   },
   description:
     'USDC-settled Paykubo result claim for credit-metered API usage that exceeded the prepaid quote.',
@@ -187,8 +190,7 @@ const claimRoute: RouteConfig = {
           network: x402Network,
           scheme: 'exact',
           facilitatorUrl:
-            envServer.X402_FACILITATOR_URL ??
-            'https://morph-rails-hoodi.morph.network/x402/v2'
+            envServer.X402_FACILITATOR_URL ?? defaultX402FacilitatorUrl
         }
       }
     }
@@ -225,12 +227,10 @@ function getRequestPayload(context: HTTPRequestContext) {
 export async function getPaykuboX402Server() {
   if (!serverPromise) {
     serverPromise = (async () => {
-      const facilitator = new MorphFacilitatorClient({
-        url:
-          envServer.X402_FACILITATOR_URL ??
-          'https://morph-rails-hoodi.morph.network/x402/v2',
-        accessKey: envServer.MORPH_X402_ACCESS_KEY,
-        secretKey: envServer.MORPH_X402_SECRET_KEY
+      const facilitator = new HmacFacilitatorClient({
+        url: envServer.X402_FACILITATOR_URL ?? defaultX402FacilitatorUrl,
+        accessKey: envServer.X402_FACILITATOR_ACCESS_KEY,
+        secretKey: envServer.X402_FACILITATOR_SECRET_KEY
       })
       const resourceServer = new x402ResourceServer(facilitator)
 

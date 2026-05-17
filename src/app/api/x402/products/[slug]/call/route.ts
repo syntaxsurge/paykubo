@@ -29,7 +29,7 @@ import { sanitizeProductRequestPayload } from '@/features/marketplace/request-pa
 import { getProviderAdapter } from '@/features/provider-adapters/registry'
 import { classifyProviderFailure } from '@/features/provider-adapters/retry-policy'
 import type { ProviderAdapterResult } from '@/features/provider-adapters/types'
-import { x402Network } from '@/lib/config/chains'
+import { defaultX402FacilitatorUrl, x402Network } from '@/lib/config/chains'
 import {
   getApiPaymentPayTo,
   getEscrowPaymentId,
@@ -38,7 +38,7 @@ import {
   releaseEscrowPayment,
   reserveEscrowPayment,
   shouldUseApiPaymentEscrow,
-  toAtomicUsdcAmount,
+  toAtomicPaymentAmount,
   waitForEscrowSettlementTransaction
 } from '@/lib/contracts/api-payment-escrow'
 import { envServer } from '@/lib/env/env.server'
@@ -824,8 +824,7 @@ function toNextResponse(
           network: x402Network,
           scheme: 'exact',
           facilitatorUrl:
-            envServer.X402_FACILITATOR_URL ??
-            'https://morph-rails-hoodi.morph.network/x402/v2'
+            envServer.X402_FACILITATOR_URL ?? defaultX402FacilitatorUrl
         }
       }),
       {
@@ -887,7 +886,7 @@ async function settlePayment({
           settlementErrorMessage ||
           'The x402 facilitator did not return a valid settlement response.',
         guidance:
-          'Confirm the buyer wallet has USDC, ETH gas, and USDC Permit2 allowance on Morph Hoodi, then try again.',
+          'Confirm the buyer wallet has USDC, native gas, and USDC Permit2 allowance on the configured network, then try again.',
         settlement: {
           status: 402
         }
@@ -1080,7 +1079,7 @@ async function reservePrepaidEscrow({
   const amount =
     'amount' in requirement
       ? BigInt(requirement.amount ?? '0')
-      : toAtomicUsdcAmount(resolvedPrice.amountUsd)
+      : toAtomicPaymentAmount(resolvedPrice.amountUsd)
   await waitForEscrowSettlementTransaction(settlement.transaction)
   const reserve = await reserveEscrowPayment({
     paymentId,
@@ -1190,7 +1189,7 @@ function buildSettlementGuidance(
     .toLowerCase()
 
   if (haystack.includes('balance') || haystack.includes('funds')) {
-    return 'The paying wallet does not appear to have enough USDC on Morph Hoodi for this API call.'
+    return 'The paying wallet does not appear to have enough USDC on the configured network for this API call.'
   }
 
   if (haystack.includes('allowance') || haystack.includes('permit2')) {
@@ -1201,7 +1200,7 @@ function buildSettlementGuidance(
     return 'The wallet signature was rejected by settlement. Re-run the payment and approve the latest x402 signature prompt.'
   }
 
-  return 'Confirm the wallet has Morph Hoodi USDC, ETH gas, and USDC Permit2 allowance, then try again.'
+  return 'Confirm the wallet has USDC, native gas, and USDC Permit2 allowance on the configured network, then try again.'
 }
 
 function describeUnknownError(error: unknown) {

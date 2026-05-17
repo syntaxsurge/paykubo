@@ -46,7 +46,8 @@ export default async function NewOrderPage({
             </p>
             <p className='mt-2 text-2xl font-semibold'>{product.priceLabel}</p>
             <p className='text-foreground/65 mt-2 text-sm leading-6'>
-              Charged only after signed x402 settlement on Morph Hoodi.
+              Charged only after signed x402 settlement on the configured
+              network.
             </p>
           </Card>
         </div>

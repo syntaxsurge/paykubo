@@ -16,7 +16,7 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
           <div>
             <p className='text-sm font-semibold'>{siteConfig.name}</p>
             <p className='text-muted-foreground text-xs'>
-              USDC-native API commerce on Morph.
+              USDC-native API commerce on EVM rails.
             </p>
           </div>
           <div className='text-muted-foreground flex flex-wrap gap-4 text-xs'>

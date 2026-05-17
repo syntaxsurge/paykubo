@@ -4,7 +4,7 @@ pragma solidity ^0.8.25;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 /// @title AgentRunAttestor
-/// @notice Stores public proof hashes for autonomous Paykubo agent runs on Morph.
+/// @notice Stores public proof hashes for autonomous Paykubo agent runs on the configured EVM network.
 contract AgentRunAttestor is AccessControl {
   struct AgentRunProof {
     address ownerWallet;

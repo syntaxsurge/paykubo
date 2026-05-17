@@ -220,7 +220,7 @@ function AgentRunContent({
           body.status === 'completed'
             ? 'Agent run completed paid actions and prepared deliverables.'
             : body.status === 'attested'
-              ? 'Proof hash attested on Morph and ready for public audit.'
+              ? 'Proof hash attested on-chain and ready for public audit.'
               : body.summary
         )
       }
@@ -270,7 +270,7 @@ function AgentRunContent({
             requiredAmount,
             tokenState.decimals,
             tokenState.symbol
-          )}. Fund the wallet with the Morph Hoodi settlement token, then try again.`
+          )}. Fund the wallet with the configured settlement token on ${defaultAppChain.shortName}, then try again.`
         )
       }
 
@@ -447,7 +447,7 @@ function AgentRunContent({
       }
 
       persistRun(body)
-      setStatus('Proof hash attested on Morph and ready for public audit.')
+      setStatus('Proof hash attested on-chain and ready for public audit.')
     } catch (caughtError) {
       setStatus(
         caughtError instanceof Error

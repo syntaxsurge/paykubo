@@ -41,15 +41,15 @@ import {
 import type { MarketplaceOrder } from '@/features/marketplace/types'
 import {
   defaultAppChain,
-  morphUsdcTokenAddress,
-  morphUsdcTokenDecimals
+  paymentTokenAddress,
+  paymentTokenDecimals
 } from '@/lib/config/chains'
 import {
   getAgentRunBytes32,
   getAgentRunVaultBudget,
   getAgentRunVaultAddress,
   getAgentVaultPaymentId,
-  parseUsdcToAtomic,
+  parsePaymentAmountToAtomic,
   type AgentVaultWriteResult,
   writeAgentRunVault
 } from '@/lib/contracts/agent-run-vault'
@@ -163,7 +163,7 @@ export async function executeAgentRunActions(
     deliverables,
     summary: completed
       ? receiptCount > 0
-        ? `The launch-pack agent completed ${completedActions.length} actions, captured ${receiptCount} USDC receipt records, and prepared an auditable Morph proof package.`
+        ? `The launch-pack agent completed ${completedActions.length} actions, captured ${receiptCount} USDC receipt records, and prepared an auditable on-chain proof package.`
         : 'The launch-pack agent completed without receipt-backed paid actions.'
       : 'The launch-pack agent stopped before completing every selected paid action.',
     status: completed ? 'completed' : 'failed'
@@ -436,7 +436,11 @@ async function advanceAgentVaultSpend({
   const paymentId = getAgentVaultPaymentId(runId, action.id)
   const result = await writeAgentRunVault({
     functionName: 'recordSpend',
-    args: [getAgentRunBytes32(runId), paymentId, parseUsdcToAtomic(amountUsd)]
+    args: [
+      getAgentRunBytes32(runId),
+      paymentId,
+      parsePaymentAmountToAtomic(amountUsd)
+    ]
   })
 
   if (!result) {
@@ -469,7 +473,7 @@ async function refundAgentVaultAdvance({
     throw new Error('The vault payment ID is missing for this agent action.')
   }
 
-  const requestedAmount = parseUsdcToAtomic(amountUsd)
+  const requestedAmount = parsePaymentAmountToAtomic(amountUsd)
   const budget = await getAgentRunVaultBudget(runId).catch(() => null)
   const refundableAmount =
     budget && budget.spentAmount < requestedAmount
@@ -1005,14 +1009,14 @@ async function returnAgentSignerUsdcToVault(amount: bigint) {
   })
   const txHash = await walletClient
     .writeContract({
-      address: morphUsdcTokenAddress as Address,
+      address: paymentTokenAddress as Address,
       abi: usdcAgentAbi,
       functionName: 'transfer',
       args: [vaultAddress, amount]
     })
     .catch(error => {
       throw new Error(
-        `Agent signer could not return unused USDC to the vault. The signer may need Hoodi ETH for gas. ${
+        `Agent signer could not return unused USDC to the vault. The signer may need ${defaultAppChain.nativeCurrency.symbol} gas on ${defaultAppChain.shortName}. ${
           error instanceof Error ? error.message : String(error)
         }`
       )
@@ -1039,8 +1043,8 @@ async function ensureAgentCanPayWithPermit2(amountUsd: number) {
   }
 
   const requiredAmount = parseUnits(
-    amountUsd.toFixed(Math.min(morphUsdcTokenDecimals, 6)),
-    morphUsdcTokenDecimals
+    amountUsd.toFixed(Math.min(paymentTokenDecimals, 6)),
+    paymentTokenDecimals
   )
 
   if (requiredAmount <= 0n) {
@@ -1050,7 +1054,7 @@ async function ensureAgentCanPayWithPermit2(amountUsd: number) {
   const account = privateKeyToAccount(
     (privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`) as Hex
   )
-  const tokenAddress = morphUsdcTokenAddress as Address
+  const tokenAddress = paymentTokenAddress as Address
   const [balance, allowance] = await Promise.all([
     agentPublicClient.readContract({
       address: tokenAddress,
@@ -1093,7 +1097,7 @@ async function ensureAgentCanPayWithPermit2(amountUsd: number) {
     })
     .catch(error => {
       throw new Error(
-        `Agent signer received vault USDC but could not submit the Permit2 approval. Fund the agent signer with a small amount of Hoodi ETH for gas. ${
+        `Agent signer received vault USDC but could not submit the Permit2 approval. Fund the agent signer with a small amount of ${defaultAppChain.nativeCurrency.symbol} on ${defaultAppChain.shortName} for gas. ${
           error instanceof Error ? error.message : String(error)
         }`
       )
@@ -1143,7 +1147,7 @@ async function waitForAgentPermit2Allowance({
 }
 
 function formatUsdcAmount(amount: bigint) {
-  return `${Number(formatUnits(amount, morphUsdcTokenDecimals)).toLocaleString(
+  return `${Number(formatUnits(amount, paymentTokenDecimals)).toLocaleString(
     undefined,
     {
       maximumFractionDigits: 6

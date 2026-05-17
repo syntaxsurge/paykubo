@@ -1,9 +1,9 @@
-import { attestAgentRunOnMorph } from '@/features/agents/attestation'
 import {
   buildProofId,
   getAgentRunReceiptIds,
   hashAgentRunProof
 } from '@/features/agents/proof'
+import { attestAgentRunOnChain } from '@/features/agents/proof-attestation'
 import { executeAgentRunActions } from '@/features/agents/runner'
 import { getAgentTemplate } from '@/features/agents/templates'
 import type {
@@ -20,9 +20,9 @@ import {
   getAgentRunVaultAddress,
   getAgentRunVaultExplorerUrl,
   getAgentSignerAddress,
-  getUsdcTokenAddress,
+  getPaymentTokenAddress,
   isActiveAgentRunVaultBudget,
-  parseUsdcToAtomic,
+  parsePaymentAmountToAtomic,
   writeAgentRunVault
 } from '@/lib/contracts/agent-run-vault'
 import { getConvexClient } from '@/lib/db/convex/client'
@@ -195,7 +195,7 @@ export async function createAgentRun(input: CreateAgentRunInput) {
     availableAmountUsdc: '0.00 USDC',
     ledgerEvents: [],
     summary:
-      'The launch-pack agent is ready to select paid tools, spend within budget, and prepare a Morph proof.',
+      'The launch-pack agent is ready to select paid tools, spend within budget, and prepare a on-chain proof.',
     deliverables: {},
     actions: [],
     createdAt: now,
@@ -434,8 +434,8 @@ export async function prepareAgentRunFunding(runId: string) {
     funding: {
       runId: getAgentRunBytes32(run.id),
       vaultAddress,
-      tokenAddress: getUsdcTokenAddress(),
-      amount: parseUsdcToAtomic(run.budgetCapUsdc).toString(),
+      tokenAddress: getPaymentTokenAddress(),
+      amount: parsePaymentAmountToAtomic(run.budgetCapUsdc).toString(),
       amountUsdc: `${run.budgetCapUsdc.toFixed(2)} USDC`,
       agentSigner,
       expiresAt
@@ -581,7 +581,7 @@ export async function attestStoredAgentRun(runId: string) {
   runs.set(run.id, attestingRun)
   await persistAgentRun(attestingRun)
 
-  const attestation = await attestAgentRunOnMorph(run, proofBase)
+  const attestation = await attestAgentRunOnChain(run, proofBase)
   const proof: AgentProof = {
     ...proofBase,
     txHash: attestation.txHash,

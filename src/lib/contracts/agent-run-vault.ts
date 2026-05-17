@@ -16,8 +16,8 @@ import { buildExplorerUrl } from '@/features/marketplace/receipts'
 import {
   defaultAppChain,
   getExplorerAddressUrl,
-  morphUsdcTokenDecimals,
-  morphUsdcTokenAddress
+  paymentTokenDecimals,
+  paymentTokenAddress
 } from '@/lib/config/chains'
 import { envClient } from '@/lib/env/env.client'
 import { envServer } from '@/lib/env/env.server'
@@ -218,19 +218,19 @@ export function getAgentVaultPaymentId(runId: string, actionId: string) {
   return keccak256(toBytes(`${runId}:${actionId}`))
 }
 
-export function parseUsdcToAtomic(amountUsdc: number | string) {
+export function parsePaymentAmountToAtomic(amount: number | string) {
   return parseUnits(
-    Number(amountUsdc).toFixed(Math.min(morphUsdcTokenDecimals, 6)),
-    morphUsdcTokenDecimals
+    Number(amount).toFixed(Math.min(paymentTokenDecimals, 6)),
+    paymentTokenDecimals
   )
 }
 
-export function formatAtomicUsdc(amount: bigint) {
-  return `${Number(formatUnits(amount, morphUsdcTokenDecimals)).toFixed(2)} USDC`
+export function formatAtomicPaymentAmount(amount: bigint) {
+  return `${Number(formatUnits(amount, paymentTokenDecimals)).toFixed(2)} USDC`
 }
 
-export function getUsdcTokenAddress() {
-  return morphUsdcTokenAddress as Address
+export function getPaymentTokenAddress() {
+  return paymentTokenAddress as Address
 }
 
 export async function getAgentRunVaultBudget(runId: string) {

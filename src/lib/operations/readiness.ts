@@ -1,6 +1,10 @@
 import { getPublishedProducts } from '@/features/marketplace/products'
 import { listSettlementReceipts } from '@/features/marketplace/receipt-store'
-import { x402Network } from '@/lib/config/chains'
+import {
+  defaultAppChain,
+  defaultX402FacilitatorUrl,
+  x402Network
+} from '@/lib/config/chains'
 import { envClient } from '@/lib/env/env.client'
 import { envServer } from '@/lib/env/env.server'
 
@@ -19,14 +23,14 @@ export async function getOperationalReadiness() {
     listSettlementReceipts()
   ])
   const facilitatorUrl =
-    envServer.X402_FACILITATOR_URL ??
-    'https://morph-rails-hoodi.morph.network/x402/v2'
+    envServer.X402_FACILITATOR_URL ?? defaultX402FacilitatorUrl
 
   const items: ReadinessItem[] = [
     {
-      label: 'Morph network',
+      label: 'Payment network',
       value: x402Network,
-      state: x402Network === 'eip155:2910' ? 'ready' : 'attention',
+      state:
+        x402Network === `eip155:${defaultAppChain.id}` ? 'ready' : 'attention',
       detail: 'Paid API routes settle USDC on the configured x402 network.'
     },
     {
@@ -93,7 +97,7 @@ export async function getOperationalReadiness() {
         ? 'ready'
         : 'attention',
       detail:
-        'Completed agent runs write proof hashes to the Morph attestor contract.'
+        'Completed agent runs write proof hashes to the configured attestor contract.'
     },
     {
       label: 'Agent proof pages',

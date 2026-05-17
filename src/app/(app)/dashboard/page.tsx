@@ -12,6 +12,7 @@ import {
   getMarketplaceMetrics,
   getPublishedProducts
 } from '@/features/marketplace/products'
+import { defaultAppChain } from '@/lib/config/chains'
 
 export default async function DashboardPage() {
   const products = await getPublishedProducts()
@@ -75,7 +76,7 @@ export default async function DashboardPage() {
           ['Published APIs', metrics.productCount.toString()],
           ['Recorded calls', metrics.totalCalls.toLocaleString()],
           ['USDC volume', metrics.totalRevenueUsdc],
-          ['Network', 'Morph Hoodi']
+          ['Network', defaultAppChain.shortName]
         ].map(([label, value]) => (
           <Card key={label} className='relative overflow-hidden'>
             <div className='bg-accent absolute top-0 left-0 h-1 w-full' />

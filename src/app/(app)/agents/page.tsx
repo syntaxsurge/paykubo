@@ -96,7 +96,7 @@ export default async function AgentsPage({ searchParams }: AgentsPageProps) {
               </h1>
               <p className='text-foreground/70 max-w-2xl text-sm leading-6'>
                 Start from a template or blank run. The agent plans with OpenAI,
-                spends through x402, records receipts, and publishes a Morph
+                spends through x402, records receipts, and publishes an on-chain
                 proof.
               </p>
             </div>
