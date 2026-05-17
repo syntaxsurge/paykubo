@@ -7,8 +7,8 @@ import {
   type ServerDataTableColumn
 } from '@/components/data-display/server-data-table'
 import { Badge } from '@/components/ui/badge'
-import { buttonClasses } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { AgentRunRowActions } from '@/features/agents/agent-run-row-actions'
 import { getAgentMetrics, listAgentRuns } from '@/features/agents/store'
 import type { AgentRun } from '@/features/agents/types'
 import {
@@ -25,6 +25,8 @@ type AdminAgentsPageProps = {
     pageSize?: string
   }>
 }
+
+export const dynamic = 'force-dynamic'
 
 export default async function AdminAgentsPage({
   searchParams
@@ -213,14 +215,8 @@ function agentColumns(): ServerDataTableColumn<AgentRun>[] {
     {
       key: 'actions',
       label: 'Actions',
-      render: run => (
-        <Link
-          href={`/agents/${run.id}`}
-          className={buttonClasses({ variant: 'outline', size: 'sm' })}
-        >
-          Inspect
-        </Link>
-      )
+      className: 'w-20 text-right',
+      render: run => <AgentRunRowActions run={run} />
     }
   ]
 }

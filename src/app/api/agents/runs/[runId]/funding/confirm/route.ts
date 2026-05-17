@@ -40,5 +40,15 @@ export async function POST(
     )
   }
 
+  if (run.fundingStatus !== 'funded') {
+    return NextResponse.json(
+      {
+        ...run,
+        error: run.summary || 'Agent run funding was not confirmed on-chain.'
+      },
+      { status: 412 }
+    )
+  }
+
   return NextResponse.json(run)
 }

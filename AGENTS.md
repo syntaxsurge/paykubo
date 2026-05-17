@@ -617,12 +617,15 @@ Before creating a new helper or service file:
   video-first launch campaigns that combine public data scans with async
   media-generation tools when budget allows. Agent runs require the owner to
   fund the `AgentRunVault` with USDC before the configured agent signer can
-  execute x402 paid actions. Before each paid action, Paykubo advances the
-  quoted USDC amount from the vault to the agent signer with `recordSpend`,
-  verifies the signer's balance, submits the required Permit2 approval when the
-  allowance is insufficient, waits until the allowance is readable, and then
-  executes the hosted x402 call from the same origin that triggered the run. If
-  a pre-settlement failure occurs after the vault advance, or if an escrowed
+  execute x402 paid actions. Funding confirmation and execution both verify the
+  run against the current deployed vault's `budgetOf` state, so stale local
+  funding records from an old vault reset to an unfunded state instead of
+  attempting `recordSpend`. Before each paid action, Paykubo advances the quoted
+  USDC amount from the vault to the agent signer with `recordSpend`, verifies
+  the signer's balance, submits the required Permit2 approval when the allowance
+  is insufficient, waits until the allowance is readable, and then executes the
+  hosted x402 call from the same origin that triggered the run. If a
+  pre-settlement failure occurs after the vault advance, or if an escrowed
   provider failure refunds the x402 payment back to the signer, Paykubo returns
   the USDC to the vault and records `recordSpendRefund`; unrecovered settlement
   or refund failures stay counted as spent and remain visible in diagnostics.
@@ -649,7 +652,10 @@ Before creating a new helper or service file:
 - `/agents` is a tabbed command center that opens on recent runs and also
   exposes a templates tab. Both tabs use separate server-fed tables with search,
   sorting, and pagination; recent runs support current-page row selection and
-  bulk deletion, while templates omit selection controls. `/agents/new`
+  bulk deletion through the shared confirmation dialog, while each run row uses
+  a three-dot action menu for opening or deleting the run. Successful single and
+  bulk deletes remove affected rows from the current table immediately and then
+  refresh server data. Templates omit selection controls. `/agents/new`
   configures objective, source context, owner wallet from the connected wallet
   session, budget cap, max paid actions, and allowed paid tools in a single
   vertical four-step flow: goal, tools, funded budget, and review. Blank runs

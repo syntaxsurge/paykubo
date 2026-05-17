@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { Trash2 } from 'lucide-react'
+import { Loader2, Trash2 } from 'lucide-react'
 import { useRouter } from 'nextjs-toploader/app'
 
 import { notifyServerTableSelectionUpdated } from '@/components/data-display/server-data-table-master-checkbox'
 import { Button } from '@/components/ui/button'
+import { Dialog } from '@/components/ui/dialog'
 
 export type ServerDataTableBulkAction = {
   label: string
@@ -33,6 +34,10 @@ export function ServerDataTableSelection({
   const router = useRouter()
   const masterCheckboxRef = useRef<HTMLInputElement>(null)
   const [internalSelectedIds, setInternalSelectedIds] = useState<string[]>([])
+  const [pendingAction, setPendingAction] =
+    useState<ServerDataTableBulkAction | null>(null)
+  const [isRunningAction, setIsRunningAction] = useState(false)
+  const [actionError, setActionError] = useState('')
   const effectiveSelectedIds = selectedIds ?? internalSelectedIds
   const selectedSet = useMemo(
     () => new Set(effectiveSelectedIds),
@@ -129,27 +134,41 @@ export function ServerDataTableSelection({
       return
     }
 
-    if (action.confirmMessage && !window.confirm(action.confirmMessage)) {
-      return
-    }
+    setIsRunningAction(true)
+    setActionError('')
 
-    const response = await fetch(action.endpoint, {
-      method: action.method ?? 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: effectiveSelectedIds })
-    })
+    try {
+      const ids = [...effectiveSelectedIds]
+      const response = await fetch(action.endpoint, {
+        method: action.method ?? 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids })
+      })
 
-    if (!response.ok) {
       const body = (await response.json().catch(() => null)) as {
         error?: string
+        deletedRunIds?: string[]
       } | null
 
-      window.alert(body?.error ?? 'Bulk action failed.')
-      return
-    }
+      if (!response.ok) {
+        throw new Error(body?.error ?? 'Bulk action failed.')
+      }
 
-    updateSelection([])
-    router.refresh()
+      removeRowsFromDom(ids)
+      removeAgentRunSessionStorage(body?.deletedRunIds ?? ids)
+      updateResultCount(tableId, ids.length)
+      updateSelection([])
+      setPendingAction(null)
+      router.refresh()
+    } catch (caughtError) {
+      setActionError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Bulk action failed.'
+      )
+    } finally {
+      setIsRunningAction(false)
+    }
   }
 
   return (
@@ -175,7 +194,10 @@ export function ServerDataTableSelection({
               variant='outline'
               size='sm'
               disabled={selectedSet.size === 0}
-              onClick={() => void runBulkAction(action)}
+              onClick={() => {
+                setActionError('')
+                setPendingAction(action)
+              }}
             >
               <Trash2 className='h-4 w-4' aria-hidden />
               {action.label}
@@ -186,10 +208,102 @@ export function ServerDataTableSelection({
       <span className='sr-only' aria-live='polite'>
         {effectiveSelectedIds.length} rows selected
       </span>
+      <Dialog
+        open={Boolean(pendingAction)}
+        onOpenChange={open => {
+          if (!open && !isRunningAction) {
+            setPendingAction(null)
+            setActionError('')
+          }
+        }}
+        title={pendingAction?.label ?? 'Confirm bulk action'}
+        description={`${effectiveSelectedIds.length} ${
+          effectiveSelectedIds.length === 1 ? 'row is' : 'rows are'
+        } selected.`}
+        className='max-w-xl'
+      >
+        <div className='space-y-5'>
+          <div className='border-border bg-muted/30 rounded-lg border p-4'>
+            <p className='font-semibold'>Confirm this action</p>
+            <p className='text-muted-foreground mt-2 text-sm leading-6'>
+              {pendingAction?.confirmMessage ??
+                'This action will run for the selected rows.'}
+            </p>
+          </div>
+
+          {actionError ? (
+            <p
+              className='rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300'
+              role='alert'
+            >
+              {actionError}
+            </p>
+          ) : null}
+
+          <div className='flex flex-col-reverse gap-3 sm:flex-row sm:justify-end'>
+            <Button
+              type='button'
+              variant='outline'
+              disabled={isRunningAction}
+              onClick={() => {
+                setPendingAction(null)
+                setActionError('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type='button'
+              disabled={!pendingAction || isRunningAction}
+              className='bg-red-600 text-white hover:bg-red-700'
+              onClick={() => {
+                if (pendingAction) {
+                  void runBulkAction(pendingAction)
+                }
+              }}
+            >
+              {isRunningAction ? (
+                <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
+              ) : (
+                <Trash2 className='h-4 w-4' aria-hidden />
+              )}
+              Confirm
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   )
 }
 
 function dedupeIds(ids: string[]) {
   return Array.from(new Set(ids))
+}
+
+function removeRowsFromDom(ids: string[]) {
+  ids.forEach(id => {
+    document.querySelector(`[data-table-row-id="${CSS.escape(id)}"]`)?.remove()
+  })
+}
+
+function removeAgentRunSessionStorage(ids: string[]) {
+  ids.forEach(id => {
+    window.sessionStorage.removeItem(`paykubo:agent-run:${id}`)
+  })
+}
+
+function updateResultCount(tableId: string, removedCount: number) {
+  const element = document.querySelector<HTMLElement>(
+    `[data-table-result-count="${CSS.escape(tableId)}"]`
+  )
+
+  if (!element) {
+    return
+  }
+
+  const current = Number(element.dataset.tableTotalRows ?? 0)
+  const next = Math.max(0, current - removedCount)
+
+  element.dataset.tableTotalRows = String(next)
+  element.textContent = `${next.toLocaleString()} result${next === 1 ? '' : 's'}`
 }

@@ -175,6 +175,10 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
       }
 
       if (!confirmResponse.ok) {
+        if (body.id) {
+          persistRun(body)
+        }
+
         throw new Error(body.error ?? 'Unable to confirm funding.')
       }
 
@@ -500,7 +504,11 @@ function RunControlPanel({
             onClick={onFund}
             disabled={
               isFunding ||
-              !['unfunded', 'funding_pending'].includes(run.fundingStatus)
+              !['unfunded', 'funding_pending', 'refund_available'].includes(
+                run.fundingStatus
+              ) ||
+              (run.fundingStatus === 'refund_available' &&
+                run.availableAmountUsdc !== '0.00 USDC')
             }
           >
             <WalletCards className='h-4 w-4' aria-hidden />

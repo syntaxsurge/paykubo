@@ -17,12 +17,12 @@ export async function POST(request: Request) {
     )
   }
 
-  const deleted = (await Promise.all(ids.map(id => deleteAgentRun(id)))).filter(
-    Boolean
-  )
+  const results = await Promise.all(ids.map(id => deleteAgentRun(id)))
+  const deletedRunIds = results.flatMap(run => (run ? [run.id] : []))
 
   return NextResponse.json({
-    deleted: deleted.length,
+    deleted: deletedRunIds.length,
+    deletedRunIds,
     requested: ids.length
   })
 }

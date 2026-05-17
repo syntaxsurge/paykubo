@@ -26,6 +26,19 @@ export type AgentVaultWriteResult = {
   explorerUrl: string | null
 }
 
+export type AgentRunVaultBudget = {
+  owner: Address
+  agentSigner: Address
+  token: Address
+  fundedAmount: bigint
+  spentAmount: bigint
+  refundedAmount: bigint
+  expiresAt: bigint
+  state: number
+  createdAt: bigint
+  updatedAt: bigint
+}
+
 export const agentRunVaultAbi = [
   {
     type: 'function',
@@ -185,6 +198,39 @@ export function getUsdcTokenAddress() {
   return morphUsdcTokenAddress as Address
 }
 
+export async function getAgentRunVaultBudget(runId: string) {
+  const address = getAgentRunVaultAddress()
+
+  if (!address) {
+    return null
+  }
+
+  const budget = await publicClient.readContract({
+    address,
+    abi: agentRunVaultAbi,
+    functionName: 'budgetOf',
+    args: [getAgentRunBytes32(runId)]
+  })
+
+  return normalizeAgentRunVaultBudget(budget)
+}
+
+export function isActiveAgentRunVaultBudget(
+  budget: AgentRunVaultBudget | null
+) {
+  if (!budget) {
+    return false
+  }
+
+  const now = BigInt(Math.floor(Date.now() / 1000))
+
+  return (
+    (budget.state === 1 || budget.state === 2) &&
+    budget.fundedAmount > budget.spentAmount + budget.refundedAmount &&
+    budget.expiresAt > now
+  )
+}
+
 export async function writeAgentRunVault({
   functionName,
   args
@@ -225,5 +271,38 @@ export async function writeAgentRunVault({
   return {
     txHash,
     explorerUrl: buildExplorerUrl(txHash)
+  }
+}
+
+function normalizeAgentRunVaultBudget(value: unknown): AgentRunVaultBudget {
+  if (Array.isArray(value)) {
+    return {
+      owner: value[0] as Address,
+      agentSigner: value[1] as Address,
+      token: value[2] as Address,
+      fundedAmount: BigInt(value[3] ?? 0),
+      spentAmount: BigInt(value[4] ?? 0),
+      refundedAmount: BigInt(value[5] ?? 0),
+      expiresAt: BigInt(value[6] ?? 0),
+      state: Number(value[7] ?? 0),
+      createdAt: BigInt(value[8] ?? 0),
+      updatedAt: BigInt(value[9] ?? 0)
+    }
+  }
+
+  const budget = value as Partial<AgentRunVaultBudget> | null
+  const zeroAddress = '0x0000000000000000000000000000000000000000'
+
+  return {
+    owner: (budget?.owner ?? zeroAddress) as Address,
+    agentSigner: (budget?.agentSigner ?? zeroAddress) as Address,
+    token: (budget?.token ?? zeroAddress) as Address,
+    fundedAmount: BigInt(budget?.fundedAmount ?? 0),
+    spentAmount: BigInt(budget?.spentAmount ?? 0),
+    refundedAmount: BigInt(budget?.refundedAmount ?? 0),
+    expiresAt: BigInt(budget?.expiresAt ?? 0),
+    state: Number(budget?.state ?? 0),
+    createdAt: BigInt(budget?.createdAt ?? 0),
+    updatedAt: BigInt(budget?.updatedAt ?? 0)
   }
 }

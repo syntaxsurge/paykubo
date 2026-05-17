@@ -66,7 +66,10 @@ export function ServerDataTable<T>({
   bulkActions?: ServerDataTableBulkAction[]
 }) {
   return (
-    <div className='border-border bg-card/90 overflow-hidden rounded-lg border shadow-sm'>
+    <div
+      className='border-border bg-card/90 overflow-hidden rounded-lg border shadow-sm'
+      data-server-table-id={id}
+    >
       <div className='border-border bg-background/50 border-b p-4'>
         <div className='flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between'>
           {showSearch ? (
@@ -83,7 +86,11 @@ export function ServerDataTable<T>({
           ) : (
             <div />
           )}
-          <div className='text-muted-foreground text-sm'>
+          <div
+            className='text-muted-foreground text-sm'
+            data-table-result-count={id}
+            data-table-total-rows={totalRows}
+          >
             {totalRows.toLocaleString()} result{totalRows === 1 ? '' : 's'}
           </div>
         </div>
@@ -146,7 +153,11 @@ export function ServerDataTable<T>({
               const rowId = getRowId(row)
 
               return (
-                <tr key={rowId} className='hover:bg-muted/25 transition'>
+                <tr
+                  key={rowId}
+                  data-table-row-id={rowId}
+                  className='hover:bg-muted/25 transition'
+                >
                   {enableSelection ? (
                     <td className='px-4 py-4 align-top'>
                       <input

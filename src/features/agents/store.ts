@@ -15,10 +15,12 @@ import type {
 import { buildExplorerUrl } from '@/features/marketplace/receipts'
 import {
   getAgentRunBytes32,
+  getAgentRunVaultBudget,
   getAgentRunVaultAddress,
   getAgentRunVaultExplorerUrl,
   getAgentSignerAddress,
   getUsdcTokenAddress,
+  isActiveAgentRunVaultBudget,
   parseUsdcToAtomic,
   writeAgentRunVault
 } from '@/lib/contracts/agent-run-vault'
@@ -179,6 +181,35 @@ export async function executeStoredAgentRun(runId: string, appUrl?: string) {
     } satisfies AgentRun
   }
 
+  const budget = await getAgentRunVaultBudget(run.id).catch(() => null)
+
+  if (!isActiveAgentRunVaultBudget(budget) && budget?.state === 0) {
+    const nextRun = resetRunFundingState(
+      run,
+      'This run is not funded in the current AgentRunVault. Fund the agent again before retrying paid actions.'
+    )
+
+    runs.set(run.id, nextRun)
+    await persistAgentRun(nextRun)
+
+    return nextRun
+  }
+
+  if (!isActiveAgentRunVaultBudget(budget)) {
+    const nextRun = {
+      ...run,
+      status: 'failed',
+      summary:
+        'This run has an AgentRunVault budget, but it is no longer active for new paid actions. Refund unused budget, then create or fund a fresh run.',
+      updatedAt: new Date().toISOString()
+    } satisfies AgentRun
+
+    runs.set(run.id, nextRun)
+    await persistAgentRun(nextRun)
+
+    return nextRun
+  }
+
   const running = {
     ...run,
     status: 'running',
@@ -232,7 +263,7 @@ export async function executeStoredAgentRun(runId: string, appUrl?: string) {
   await persistAgentRun(nextRun)
 
   await writeAgentRunVault({
-    functionName: 'markCompleted',
+    functionName: result.status === 'completed' ? 'markCompleted' : 'cancelRun',
     args: [getAgentRunBytes32(run.id)]
   }).catch(() => null)
 
@@ -246,6 +277,22 @@ export async function prepareAgentRunFunding(runId: string) {
 
   if (!run) {
     return null
+  }
+
+  const existingBudget = await getAgentRunVaultBudget(run.id).catch(() => null)
+
+  if (isActiveAgentRunVaultBudget(existingBudget)) {
+    return {
+      error:
+        'This agent run is already funded in the current AgentRunVault. Run the agent or refund unused budget before funding it again.'
+    }
+  }
+
+  if (existingBudget && existingBudget.state !== 0) {
+    return {
+      error:
+        'This agent run already has a finalized or inactive budget in the current AgentRunVault. Refund unused budget, then create a new run.'
+    }
   }
 
   if (!vaultAddress || !agentSigner) {
@@ -303,6 +350,15 @@ export async function confirmAgentRunFunding({
 
   if (!run) {
     return null
+  }
+
+  const budget = await waitForActiveVaultBudget(run.id)
+
+  if (!isActiveAgentRunVaultBudget(budget)) {
+    return resetRunFundingState(
+      run,
+      'Funding transaction was not found in the current AgentRunVault. Confirm that your wallet submitted fundRun to the configured vault address, then fund the agent again.'
+    )
   }
 
   const amountUsdc = `${run.budgetCapUsdc.toFixed(2)} USDC`
@@ -487,6 +543,42 @@ function buildLedgerEvent({
     actionId,
     createdAt: new Date().toISOString()
   }
+}
+
+function resetRunFundingState(run: AgentRun, summary: string) {
+  return {
+    ...run,
+    status: 'planned',
+    fundingStatus: 'unfunded',
+    fundedAmountUsdc: '0.00 USDC',
+    spentAmountUsdc: '0.00 USDC',
+    reservedAmountUsdc: '0.00 USDC',
+    refundedAmountUsdc: '0.00 USDC',
+    availableAmountUsdc: '0.00 USDC',
+    fundingTxHash: undefined,
+    fundingExplorerUrl: undefined,
+    approvalTxHash: undefined,
+    approvalExplorerUrl: undefined,
+    fundingExpiresAt: undefined,
+    summary,
+    updatedAt: new Date().toISOString()
+  } satisfies AgentRun
+}
+
+async function waitForActiveVaultBudget(runId: string) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const budget = await getAgentRunVaultBudget(runId).catch(() => null)
+
+    if (isActiveAgentRunVaultBudget(budget)) {
+      return budget
+    }
+
+    if (attempt < 4) {
+      await new Promise(resolve => setTimeout(resolve, 1200))
+    }
+  }
+
+  return await getAgentRunVaultBudget(runId).catch(() => null)
 }
 
 async function buildSpendLedger(run: AgentRun, actions: AgentRun['actions']) {
