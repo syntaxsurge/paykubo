@@ -54,6 +54,18 @@ export type AgentSkippedTool = {
   reason: string
 }
 
+export type AgentAsyncPollingResponse = {
+  id: string
+  attempt: number
+  polledAt: string
+  httpStatus: number
+  orderStatus?: string
+  resultReleaseStatus?: string
+  externalJobId?: string
+  resultUrl?: string
+  response: Record<string, unknown>
+}
+
 export type AgentAction = {
   id: string
   runId: string
@@ -67,6 +79,7 @@ export type AgentAction = {
   plannerScore?: number
   requestPayload: Record<string, unknown>
   responsePayload?: Record<string, unknown>
+  asyncPollingResponses?: AgentAsyncPollingResponse[]
   receipt?: MarketplaceReceipt
   orderId?: string
   requestId?: string

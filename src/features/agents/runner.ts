@@ -27,7 +27,11 @@ import {
   buildPlannerSummary,
   parseOpenAiJson
 } from '@/features/agents/planner'
-import type { AgentAction, AgentRun } from '@/features/agents/types'
+import type {
+  AgentAction,
+  AgentAsyncPollingResponse,
+  AgentRun
+} from '@/features/agents/types'
 import { resolveProductPrice } from '@/features/marketplace/pricing'
 import { getProductBySlug } from '@/features/marketplace/products'
 import {
@@ -246,10 +250,14 @@ async function executeAgentAction(
       run.id,
       advanced,
       appUrl,
-      async progress => {
+      async (progress, pollingResponse) => {
+        const asyncPollingResponses = pollingResponse
+          ? [...(paidProgress.asyncPollingResponses ?? []), pollingResponse]
+          : paidProgress.asyncPollingResponses
         paidProgress = {
           ...paidProgress,
           responsePayload: buildPaidProductResponsePayload(progress),
+          asyncPollingResponses,
           receipt: progress.receipt,
           orderId: progress.order?.id,
           requestId: progress.order?.requestId
@@ -291,6 +299,7 @@ async function executeAgentAction(
       ...refundFields,
       status: resultStatus,
       responsePayload: buildPaidProductResponsePayload(paidResult),
+      asyncPollingResponses: paidProgress.asyncPollingResponses,
       receipt: paidResult.receipt,
       orderId: paidResult.order?.id,
       requestId: paidResult.order?.requestId,
@@ -474,7 +483,7 @@ async function callPaidProductWithAgentWallet(
   runId: string,
   action: AgentAction,
   appUrl: string,
-  onProgress?: (result: PaidProductCallResponse) => Promise<void> | void
+  onProgress?: PaidProductProgressHandler
 ) {
   const privateKey = envServer.AGENT_SPENDER_PRIVATE_KEY
 
@@ -528,6 +537,11 @@ type PaidProductCallResponse = {
   escrow?: unknown
 }
 
+type PaidProductProgressHandler = (
+  result: PaidProductCallResponse,
+  pollingResponse?: AgentAsyncPollingResponse
+) => Promise<void> | void
+
 type ProviderStatusResponse = {
   error?: string
   order?: MarketplaceOrder
@@ -549,7 +563,7 @@ async function waitForPaidProductCompletion({
 }: {
   appUrl: string
   initial: PaidProductCallResponse
-  onProgress?: (result: PaidProductCallResponse) => Promise<void> | void
+  onProgress?: PaidProductProgressHandler
 }) {
   const order = initial.order
 
@@ -571,8 +585,24 @@ async function waitForPaidProductCompletion({
       }
     )
     const body = (await readJsonResponse(response)) as ProviderStatusResponse
+    const pollingResponse = buildAsyncPollingResponse({
+      attempt,
+      httpStatus: response.status,
+      body
+    })
 
     if (!response.ok || !body.order) {
+      const failedProgress = normalizePaidProductResponse(
+        {
+          ...initial,
+          data: {
+            ...initial.data,
+            providerStatusError: body
+          }
+        },
+        lastOrder
+      )
+      await onProgress?.(failedProgress, pollingResponse)
       throw new Error(
         body.error ??
           `Unable to poll async provider status (${response.status} ${response.statusText}).`
@@ -588,7 +618,7 @@ async function waitForPaidProductCompletion({
       },
       body.order
     )
-    await onProgress?.(next)
+    await onProgress?.(next, pollingResponse)
 
     if (!shouldPollPaidOrder(body.order)) {
       return next
@@ -603,6 +633,34 @@ async function waitForPaidProductCompletion({
       .filter(Boolean)
       .join(' ')
   )
+}
+
+function buildAsyncPollingResponse({
+  attempt,
+  httpStatus,
+  body
+}: {
+  attempt: number
+  httpStatus: number
+  body: ProviderStatusResponse
+}): AgentAsyncPollingResponse {
+  const resultUrl =
+    body.order?.resultUrl ??
+    body.provider?.resultUrl ??
+    extractResultUrl(body.order?.responsePayload) ??
+    extractResultUrl(body.provider?.responsePayload)
+
+  return {
+    id: `poll_${Date.now().toString(36)}_${attempt}`,
+    attempt,
+    polledAt: new Date().toISOString(),
+    httpStatus,
+    orderStatus: body.order?.status,
+    resultReleaseStatus: body.order?.resultReleaseStatus,
+    externalJobId: body.order?.externalJobId ?? body.provider?.externalJobId,
+    resultUrl,
+    response: body as Record<string, unknown>
+  }
 }
 
 function buildPaidProductResponsePayload(result: PaidProductCallResponse) {

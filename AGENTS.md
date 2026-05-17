@@ -661,7 +661,11 @@ Before creating a new helper or service file:
   in-memory run cache. Agent action progress records the settled x402
   order/receipt and the provider's initial response as soon as the paid request
   is accepted, then keeps async media actions in `paid` state while polling for
-  the terminal provider output. When `AGENT_LLM_API_KEY` is configured, the
+  the terminal provider output. Each async provider-status poll is stored on the
+  action with attempt number, timestamp, HTTP status, order state, result-release
+  state, external job ID, result URL when present, and the raw polling response;
+  the run page renders these polling responses beneath the tool request and
+  provider response diagnostics. When `AGENT_LLM_API_KEY` is configured, the
   agent uses the OpenAI Responses API with `AGENT_LLM_MODEL` or `gpt-5.2` to
   select tools, generate request payloads, skip unrelated tools, reserve one
   affordable media tool when the objective or template requires video output,

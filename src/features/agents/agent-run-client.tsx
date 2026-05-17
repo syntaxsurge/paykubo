@@ -1276,6 +1276,16 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
           copyLabel='Copy response'
         />
       </div>
+      {action.asyncPollingResponses?.length ? (
+        <div className='mt-3'>
+          <JsonViewer
+            title='Async polling responses'
+            value={action.asyncPollingResponses}
+            defaultOpen={action.status === 'paid'}
+            copyLabel='Copy polling responses'
+          />
+        </div>
+      ) : null}
     </div>
   )
 }
