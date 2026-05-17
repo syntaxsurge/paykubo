@@ -646,19 +646,24 @@ Before creating a new helper or service file:
   a terminal result, refund state, or completed project URL. Agent-paid x402
   calls include the agent run ID in gateway order and receipt records so
   provider dashboards and usage pages count autonomous tool calls in the same
-  revenue ledger as browser and developer API calls. When `AGENT_LLM_API_KEY` is
-  configured, the agent uses the OpenAI Responses API with `AGENT_LLM_MODEL` or
-  `gpt-5.2` to select tools, generate request payloads, skip unrelated tools,
-  reserve one affordable media tool when the objective or template requires
-  video output, set a budget strategy, and synthesize the final launch pack from
-  completed paid responses and receipts. When no paid action completes in
-  production, the run remains failed and presents diagnostics instead of
-  treating generated copy as verified output. When the key is absent, the
-  deterministic fallback ranks the allowed marketplace tools from the objective
-  and source context while preserving required media-tool selection for video
-  workflows. Both planner modes record the prompt, model or fallback label,
-  rationale, skipped tools, selected tools, funding ledger, and synthesis
-  metadata in run deliverables, action cards, and proof payloads.
+  revenue ledger as browser and developer API calls. Morph Hoodi x402 payment
+  requirements use the settlement token's EIP-712 domain metadata in
+  `NEXT_PUBLIC_USDC_TOKEN_NAME` and `NEXT_PUBLIC_USDC_TOKEN_VERSION`; the public
+  UI still labels the settlement asset as USDC, but signed x402 payloads must
+  match the deployed Hoodi token domain for facilitator verification and
+  settlement. When `AGENT_LLM_API_KEY` is configured, the agent uses the OpenAI
+  Responses API with `AGENT_LLM_MODEL` or `gpt-5.2` to select tools, generate
+  request payloads, skip unrelated tools, reserve one affordable media tool when
+  the objective or template requires video output, set a budget strategy, and
+  synthesize the final launch pack from completed paid responses and receipts.
+  When no paid action completes in production, the run remains failed and
+  presents diagnostics instead of treating generated copy as verified output.
+  When the key is absent, the deterministic fallback ranks the allowed
+  marketplace tools from the objective and source context while preserving
+  required media-tool selection for video workflows. Both planner modes record
+  the prompt, model or fallback label, rationale, skipped tools, selected tools,
+  funding ledger, and synthesis metadata in run deliverables, action cards, and
+  proof payloads.
 - `/agents` is a tabbed command center that opens on recent runs and also
   exposes a templates tab. Both tabs use separate server-fed tables with search,
   sorting, and pagination; recent runs support current-page row selection and

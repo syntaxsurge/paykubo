@@ -17,6 +17,7 @@ import { MorphFacilitatorClient } from '@/lib/x402/morph-facilitator-client'
 
 const paidCallPattern = '/api/x402/products/:slug/call'
 const claimPattern = '/api/x402/orders/:orderId/claim'
+const morphX402MaxTimeoutSeconds = 60
 let serverPromise: Promise<x402HTTPResourceServer> | null = null
 
 function getProductSlugFromPath(path: string) {
@@ -87,7 +88,7 @@ const paidCallRoute: RouteConfig = {
 
       return toUsdcAssetAmount(resolvedPrice.amountUsd)
     },
-    maxTimeoutSeconds: 300
+    maxTimeoutSeconds: morphX402MaxTimeoutSeconds
   },
   description:
     'USDC-settled Paykubo API call on Morph Hoodi through the x402 protocol.',
@@ -163,7 +164,7 @@ const claimRoute: RouteConfig = {
 
       return toUsdcAssetAmount(amount)
     },
-    maxTimeoutSeconds: 300
+    maxTimeoutSeconds: morphX402MaxTimeoutSeconds
   },
   description:
     'USDC-settled Paykubo result claim for credit-metered API usage that exceeded the prepaid quote.',

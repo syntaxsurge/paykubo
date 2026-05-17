@@ -17,7 +17,6 @@ import {
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
-import { getProductBySlug } from '../src/features/marketplace/products'
 import { defaultAppChain, morphUsdcTokenAddress } from '../src/lib/config/chains'
 
 config({ path: '.env.local' })
@@ -169,7 +168,7 @@ function formatUsdcAmount(amount: bigint) {
 
 async function main() {
   const { slug, payload, url } = parseArgs()
-  const product = await getProductBySlug(slug)
+  const product = url ? null : await loadProductBySlug(slug)
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const endpointUrl =
@@ -203,7 +202,8 @@ async function main() {
 
   registerExactEvmScheme(client, { signer })
 
-  const paidFetch = wrapFetchWithPayment(fetch, client)
+  const httpClient = new x402HTTPClient(client)
+  const paidFetch = wrapFetchWithPayment(fetch, httpClient)
   const response = await paidFetch(requestUrl, {
     method,
     headers: {
@@ -213,7 +213,6 @@ async function main() {
     body: method === 'POST' ? JSON.stringify(requestPayload) : undefined
   })
   const body = await response.json().catch(() => null)
-  const httpClient = new x402HTTPClient(client)
   const paymentResponse = response.ok
     ? httpClient.getPaymentSettleResponse(name => response.headers.get(name))
     : null
@@ -235,6 +234,14 @@ async function main() {
   if (!response.ok) {
     process.exit(1)
   }
+}
+
+async function loadProductBySlug(slug: string) {
+  const { getProductBySlug } = await import(
+    '../src/features/marketplace/products'
+  )
+
+  return await getProductBySlug(slug)
 }
 
 function asRecord(value: unknown) {

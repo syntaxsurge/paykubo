@@ -4,7 +4,11 @@ import {
   getPermit2AllowanceReadParams
 } from '@x402/evm'
 import { registerExactEvmScheme } from '@x402/evm/exact/client'
-import { wrapFetchWithPayment } from '@x402/fetch'
+import {
+  type x402PaymentResult,
+  x402HTTPClient,
+  wrapFetchWithPayment
+} from '@x402/fetch'
 import {
   createPublicClient,
   createWalletClient,
@@ -453,7 +457,8 @@ async function callPaidProductWithAgentWallet(
     (privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`) as Hex
   )
   const client = registerExactEvmScheme(new x402Client(), { signer: account })
-  const paidFetch = wrapFetchWithPayment(fetch, client)
+  const httpClient = new x402HTTPClient(client)
+  const paidFetch = wrapFetchWithPayment(fetch, httpClient)
   const response = await paidFetch(
     `${appUrl}/api/x402/products/${action.productSlug}/call`,
     {
@@ -466,10 +471,13 @@ async function callPaidProductWithAgentWallet(
       body: JSON.stringify(action.requestPayload)
     }
   )
+  const paymentResult = await httpClient
+    .processResponse(response.clone())
+    .catch(() => null)
   const body = await readJsonResponse(response)
 
   if (!response.ok) {
-    throw new Error(describePaidCallFailure(response, body))
+    throw new Error(describePaidCallFailure(response, body, paymentResult))
   }
 
   return await waitForPaidProductCompletion({
@@ -904,6 +912,56 @@ async function readJsonResponse(response: Response) {
 
 function describePaidCallFailure(
   response: Response,
+  body: Record<string, unknown>,
+  paymentResult: x402PaymentResult | null
+) {
+  if (paymentResult?.kind === 'settle_failed') {
+    return (
+      [
+        paymentResult.settleResponse.errorMessage,
+        paymentResult.settleResponse.errorReason
+      ]
+        .filter(Boolean)
+        .join(' ') || 'USDC settlement failed.'
+    )
+  }
+
+  if (paymentResult?.kind === 'payment_required') {
+    return [
+      paymentResult.paymentRequired.error,
+      body.error,
+      body.message,
+      body.guidance
+    ]
+      .filter(
+        (value): value is string =>
+          typeof value === 'string' && value.length > 0
+      )
+      .join(' ')
+  }
+
+  if (paymentResult?.kind === 'error') {
+    const resultBody =
+      paymentResult.body &&
+      typeof paymentResult.body === 'object' &&
+      !Array.isArray(paymentResult.body)
+        ? (paymentResult.body as Record<string, unknown>)
+        : {}
+    const message = describePaidCallFailureBody(response, resultBody)
+
+    if (message) {
+      return message
+    }
+  }
+
+  return (
+    describePaidCallFailureBody(response, body) ||
+    `Paid product call failed with ${response.status} ${response.statusText}.`
+  )
+}
+
+function describePaidCallFailureBody(
+  response: Response,
   body: Record<string, unknown>
 ) {
   const values = [
@@ -920,10 +978,7 @@ function describePaidCallFailure(
     (value): value is string => typeof value === 'string' && value.length > 0
   )
 
-  return (
-    values.join(' ') ||
-    `Paid product call failed with ${response.status} ${response.statusText}.`
-  )
+  return values.join(' ')
 }
 
 async function buildDeliverables(
