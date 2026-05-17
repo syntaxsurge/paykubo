@@ -58,6 +58,13 @@ export type AgentAsyncPollingResponse = {
   id: string
   attempt: number
   polledAt: string
+  pollingUrl: string
+  request: {
+    method: string
+    url: string
+    headers: Record<string, string>
+    params: Record<string, string>
+  }
   httpStatus: number
   orderStatus?: string
   resultReleaseStatus?: string
@@ -79,6 +86,7 @@ export type AgentAction = {
   plannerScore?: number
   requestPayload: Record<string, unknown>
   responsePayload?: Record<string, unknown>
+  latestAsyncPollingResponse?: AgentAsyncPollingResponse
   asyncPollingResponses?: AgentAsyncPollingResponse[]
   receipt?: MarketplaceReceipt
   orderId?: string

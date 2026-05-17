@@ -251,13 +251,14 @@ async function executeAgentAction(
       advanced,
       appUrl,
       async (progress, pollingResponse) => {
-        const asyncPollingResponses = pollingResponse
-          ? [...(paidProgress.asyncPollingResponses ?? []), pollingResponse]
-          : paidProgress.asyncPollingResponses
         paidProgress = {
           ...paidProgress,
           responsePayload: buildPaidProductResponsePayload(progress),
-          asyncPollingResponses,
+          latestAsyncPollingResponse:
+            pollingResponse ?? paidProgress.latestAsyncPollingResponse,
+          asyncPollingResponses: pollingResponse
+            ? [pollingResponse]
+            : paidProgress.asyncPollingResponses,
           receipt: progress.receipt,
           orderId: progress.order?.id,
           requestId: progress.order?.requestId
@@ -299,6 +300,7 @@ async function executeAgentAction(
       ...refundFields,
       status: resultStatus,
       responsePayload: buildPaidProductResponsePayload(paidResult),
+      latestAsyncPollingResponse: paidProgress.latestAsyncPollingResponse,
       asyncPollingResponses: paidProgress.asyncPollingResponses,
       receipt: paidResult.receipt,
       orderId: paidResult.order?.id,
@@ -578,15 +580,21 @@ async function waitForPaidProductCompletion({
       await delay(asyncProviderPollIntervalMs)
     }
 
-    const response = await fetch(
-      `${appUrl}/api/orders/${encodeURIComponent(String(order?.id))}/provider-status`,
-      {
-        headers: { Accept: 'application/json' }
-      }
-    )
+    const pollingUrl = `${appUrl}/api/orders/${encodeURIComponent(String(order?.id))}/provider-status`
+    const pollingRequest = {
+      method: 'GET',
+      url: pollingUrl,
+      headers: { Accept: 'application/json' },
+      params: { orderId: String(order?.id ?? '') }
+    }
+    const response = await fetch(pollingUrl, {
+      headers: pollingRequest.headers
+    })
     const body = (await readJsonResponse(response)) as ProviderStatusResponse
     const pollingResponse = buildAsyncPollingResponse({
       attempt,
+      pollingUrl,
+      request: pollingRequest,
       httpStatus: response.status,
       body
     })
@@ -637,10 +645,14 @@ async function waitForPaidProductCompletion({
 
 function buildAsyncPollingResponse({
   attempt,
+  pollingUrl,
+  request,
   httpStatus,
   body
 }: {
   attempt: number
+  pollingUrl: string
+  request: AgentAsyncPollingResponse['request']
   httpStatus: number
   body: ProviderStatusResponse
 }): AgentAsyncPollingResponse {
@@ -654,6 +666,8 @@ function buildAsyncPollingResponse({
     id: `poll_${Date.now().toString(36)}_${attempt}`,
     attempt,
     polledAt: new Date().toISOString(),
+    pollingUrl,
+    request,
     httpStatus,
     orderStatus: body.order?.status,
     resultReleaseStatus: body.order?.resultReleaseStatus,

@@ -109,7 +109,7 @@ const publicClient = createPublicClient({
   chain: defaultAppChain.viemChain,
   transport: http(defaultAppChain.viemChain.rpcUrls.default.http[0])
 })
-const AGENT_RUN_POLL_INTERVAL_MS = 4000
+const AGENT_RUN_POLL_INTERVAL_MS = 8000
 const agentRunPollingStatuses = new Set<AgentRun['status']>([
   'running',
   'attesting'
@@ -1197,7 +1197,7 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
         ? AlertTriangle
         : Clock
   const outputItems = collectActionOutputs(action)
-  const latestPoll = action.asyncPollingResponses?.at(-1)
+  const latestPoll = getLatestAsyncPoll(action)
 
   return (
     <div className='border-border bg-background/55 rounded-lg border p-4 shadow-sm'>
@@ -1374,9 +1374,9 @@ function AsyncPollingPanel({
 }: {
   action: AgentRun['actions'][number]
 }) {
-  const polls = action.asyncPollingResponses ?? []
+  const poll = getLatestAsyncPoll(action)
 
-  if (!polls.length) {
+  if (!poll) {
     return null
   }
 
@@ -1385,32 +1385,61 @@ function AsyncPollingPanel({
       <div className='border-border/70 flex flex-wrap items-center justify-between gap-3 border-b p-3'>
         <SectionLabel icon={Activity} label='Async polling' />
         <span className='bg-muted rounded-md px-2 py-1 text-xs font-semibold'>
-          {polls.length} response{polls.length === 1 ? '' : 's'}
+          Latest response
         </span>
       </div>
-      <div className='grid gap-2 p-3'>
-        {polls.map(poll => (
-          <PollingRow key={poll.id} poll={poll} />
-        ))}
+      <div className='space-y-3 p-3'>
+        <PollingRow poll={poll} />
+        <div className='border-border/70 bg-background/45 grid gap-3 rounded-lg border p-3 text-sm md:grid-cols-[minmax(0,1fr)_auto] md:items-center'>
+          <div className='min-w-0'>
+            <p className='text-foreground/55 text-xs tracking-[0.14em] uppercase'>
+              Polling endpoint
+            </p>
+            <p className='mt-1 truncate font-semibold'>
+              {formatDisplayUrl(poll.pollingUrl).host}
+            </p>
+            <p className='text-foreground/55 mt-1 truncate text-xs'>
+              {formatDisplayUrl(poll.pollingUrl).path}
+            </p>
+          </div>
+          <a
+            href={poll.pollingUrl}
+            target='_blank'
+            rel='noreferrer'
+            className='border-border bg-card/70 text-primary inline-flex h-9 w-9 items-center justify-center rounded-lg border'
+            title='Open polling URL'
+            aria-label='Open polling URL'
+          >
+            <ExternalLink className='h-4 w-4' aria-hidden />
+          </a>
+        </div>
       </div>
       <details className='border-border/70 border-t'>
         <summary className='flex cursor-pointer list-none items-center justify-between gap-3 p-3 text-sm font-semibold [&::-webkit-details-marker]:hidden'>
           <span className='flex items-center gap-2'>
             <Braces className='text-primary h-4 w-4' aria-hidden />
-            Raw polling JSON
+            Polling request and response JSON
           </span>
           <span className='text-foreground/50 text-xs'>Expand</span>
         </summary>
         <div className='border-border/70 border-t p-3'>
           <JsonViewer
-            title='Async polling responses'
-            value={polls}
+            title='Async polling response'
+            value={poll}
             defaultOpen={false}
-            copyLabel='Copy polling responses'
+            copyLabel='Copy polling response'
           />
         </div>
       </details>
     </div>
+  )
+}
+
+function getLatestAsyncPoll(
+  action: AgentRun['actions'][number]
+): AgentAsyncPoll | undefined {
+  return (
+    action.latestAsyncPollingResponse ?? action.asyncPollingResponses?.at(-1)
   )
 }
 

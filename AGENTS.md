@@ -662,14 +662,17 @@ Before creating a new helper or service file:
   Agent action progress records the settled x402
   order/receipt and the provider's initial response as soon as the paid request
   is accepted, then keeps async media actions in `paid` state while polling for
-  the terminal provider output. Each async provider-status poll is stored on the
-  action with attempt number, timestamp, HTTP status, order state, result-release
-  state, external job ID, result URL when present, and the raw polling response;
-  the run page renders these polling responses beneath the tool output as a
-  compact timeline, with raw request/response JSON kept inside expandable
-  diagnostics. Receipt, settlement, and vault transaction links render as icon
-  actions on each tool card, while public provider result links render as compact
-  host/path previews instead of full-width raw URLs. When `AGENT_LLM_API_KEY` is
+  the terminal provider output. The latest async provider-status poll is stored
+  on the action with attempt number, timestamp, polling URL, request method,
+  headers, path parameters, HTTP status, order state, result-release state,
+  external job ID, result URL when present, and the raw polling response; each
+  new backend poll replaces the prior visible snapshot instead of growing an
+  unbounded history. The run page refreshes running and attesting runs every
+  eight seconds, renders the latest async poll beneath the tool output, and keeps
+  raw request/response JSON inside expandable diagnostics. Receipt, settlement,
+  and vault transaction links render as icon actions on each tool card, while
+  public provider result links render as compact host/path previews instead of
+  full-width raw URLs. When `AGENT_LLM_API_KEY` is
   configured, the agent uses the OpenAI Responses API with `AGENT_LLM_MODEL` or
   `gpt-5.2` to select tools, generate request payloads, skip unrelated tools,
   reserve one affordable media tool when the objective or template requires
