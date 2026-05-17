@@ -9,9 +9,9 @@ Demo URL: [DEMO_URL]
 
 ### 0:00-0:30 - Problem And Morph Use Case
 
-- **Start on:** `/demo`
-- **Show:** product headline, track badge, Morph Hoodi, USDC, x402 Agentic
-  Payments, Philippines and Southeast Asia relevance.
+- **Start on:** `/`
+- **Show:** product headline, Morph Hoodi, USDC, x402 Agentic Payments, and
+  Philippines and Southeast Asia relevance.
 - **Voiceover:**
   > "We are building this product for the x402 Agentic Payments track. In the
   > Philippines and Southeast Asia, useful APIs are hard to monetize without
@@ -63,9 +63,9 @@ Demo URL: [DEMO_URL]
 
 ### 1:30-2:00 - What's Next
 
-- **End on:** `/demo` or `/proofs/[proofId]`
-- **Show:** Links to Marketplace, Start live agent run, Provider dashboard, API
-  reference.
+- **End on:** `/proofs/[proofId]` or `/agents/[runId]`
+- **Show:** receipt links, proof state, paid actions, and the final agent
+  deliverable.
 - **Voiceover:**
   > "Next, we will add more Philippine and Southeast Asian providers, stronger
   > agent templates for local business workflows, and production analytics. The
@@ -103,8 +103,8 @@ Demo URL: [DEMO_URL]
 
 ## Essential Shots Checklist
 
-- `/demo` shows "x402 Agentic Payments", Morph Hoodi, USDC, and
-  Philippines/Southeast Asia context.
+- `/` shows Morph Hoodi, USDC, x402 payments, and Philippines/Southeast Asia
+  context.
 - `/marketplace` shows paid API listings with provider, price, and agent-ready
   status.
 - A product or order screen shows x402 payment requirements and a USDC quote.
