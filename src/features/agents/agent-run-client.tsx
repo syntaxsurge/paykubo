@@ -40,6 +40,28 @@ import {
   erc20ApprovalAbi
 } from '@/lib/contracts/agent-run-vault'
 
+type AgentOutputItem = {
+  id: string
+  label: string
+  kind: 'text' | 'video' | 'image' | 'link'
+  value: string
+  source: string
+}
+
+type AgentOutputCandidate = {
+  id: string
+  label: string
+  source: string
+  value?: string
+  kind?: AgentOutputItem['kind']
+}
+
+type ExtractedOutput = {
+  path: string
+  value: string
+  kind: AgentOutputItem['kind']
+}
+
 type AgentRunClientProps = {
   runId: string
   initialRun: AgentRun | null
@@ -299,6 +321,7 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
     ['failed', 'completed', 'attested'].includes(run.status) &&
     run.fundingStatus === 'refund_available' &&
     run.availableAmountUsdc !== '0.00 USDC'
+  const finalOutputs = collectFinalOutputs(run)
 
   return (
     <div className='space-y-6'>
@@ -533,6 +556,8 @@ export function AgentRunClient({ runId, initialRun }: AgentRunClientProps) {
         </section>
       ) : null}
 
+      <FinalOutputSection outputs={finalOutputs} run={run} />
+
       <Card>
         <JsonViewer
           title='Planner, receipts, and deliverable diagnostics'
@@ -658,6 +683,7 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
       : action.status === 'failed'
         ? AlertTriangle
         : Clock
+  const outputItems = collectActionOutputs(action)
 
   return (
     <div className='border-border bg-background/60 rounded-lg border p-4'>
@@ -714,6 +740,34 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
           ) : null}
         </div>
       ) : null}
+      {outputItems.length > 0 ? (
+        <div className='mt-4'>
+          <p className='text-foreground/60 text-xs tracking-[0.14em] uppercase'>
+            Tool output
+          </p>
+          <OutputGallery outputs={outputItems} className='mt-3' compact />
+        </div>
+      ) : null}
+      <div className='mt-4 grid gap-3 lg:grid-cols-2'>
+        <JsonViewer
+          title='Tool request'
+          value={action.requestPayload}
+          defaultOpen={false}
+          copyLabel='Copy request'
+        />
+        <JsonViewer
+          title='Tool response'
+          value={
+            action.responsePayload ?? {
+              status: action.status,
+              errorMessage:
+                action.errorMessage ?? 'No response payload recorded yet.'
+            }
+          }
+          defaultOpen={false}
+          copyLabel='Copy response'
+        />
+      </div>
     </div>
   )
 }
@@ -772,6 +826,350 @@ function DeliverableCard({ title, value }: { title: string; value?: string }) {
       />
     </Card>
   )
+}
+
+function FinalOutputSection({
+  outputs,
+  run
+}: {
+  outputs: AgentOutputItem[]
+  run: AgentRun
+}) {
+  const completedActions = run.actions.filter(
+    action => action.status === 'completed'
+  )
+
+  return (
+    <Card className='space-y-4 overflow-hidden'>
+      <div className='flex flex-wrap items-start justify-between gap-3'>
+        <div>
+          <p className='text-foreground/60 text-xs tracking-[0.16em] uppercase'>
+            Final output
+          </p>
+          <h3 className='mt-1 text-lg font-semibold'>Agent deliverables</h3>
+          <p className='text-foreground/65 mt-1 max-w-2xl text-sm leading-6'>
+            Rendered media, result links, and final text extracted from the
+            agent's completed tool responses and synthesis.
+          </p>
+        </div>
+        <span className='bg-muted rounded-md px-2 py-1 text-xs font-semibold'>
+          {completedActions.length} completed tool
+          {completedActions.length === 1 ? '' : 's'}
+        </span>
+      </div>
+      {outputs.length > 0 ? (
+        <OutputGallery outputs={outputs} />
+      ) : (
+        <p className='border-border text-foreground/65 rounded-lg border border-dashed p-4 text-sm leading-6'>
+          Final outputs appear here after a paid tool returns text, image,
+          video, or result URLs. Use the tool response panels above to inspect
+          failed or pending calls.
+        </p>
+      )}
+    </Card>
+  )
+}
+
+function OutputGallery({
+  outputs,
+  className,
+  compact = false
+}: {
+  outputs: AgentOutputItem[]
+  className?: string
+  compact?: boolean
+}) {
+  return (
+    <div
+      className={[
+        'grid gap-3',
+        compact ? 'md:grid-cols-2' : 'lg:grid-cols-2',
+        className
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      {outputs.map(output => (
+        <OutputPreview key={output.id} output={output} compact={compact} />
+      ))}
+    </div>
+  )
+}
+
+function OutputPreview({
+  output,
+  compact
+}: {
+  output: AgentOutputItem
+  compact?: boolean
+}) {
+  return (
+    <div className='border-border bg-background/60 overflow-hidden rounded-lg border'>
+      <div className='border-border/80 flex flex-wrap items-start justify-between gap-2 border-b p-3'>
+        <div className='min-w-0'>
+          <p className='font-semibold break-words'>{output.label}</p>
+          <p className='text-foreground/55 mt-1 text-xs'>{output.source}</p>
+        </div>
+        <span className='bg-muted rounded-md px-2 py-1 text-xs font-semibold'>
+          {output.kind}
+        </span>
+      </div>
+      {output.kind === 'video' ? (
+        <div className='bg-black'>
+          <video
+            src={output.value}
+            controls
+            playsInline
+            className={compact ? 'max-h-56 w-full' : 'max-h-96 w-full'}
+          />
+        </div>
+      ) : null}
+      {output.kind === 'image' ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={output.value}
+          alt={output.label}
+          className={
+            compact
+              ? 'max-h-56 w-full object-contain'
+              : 'max-h-96 w-full object-contain'
+          }
+        />
+      ) : null}
+      {output.kind === 'text' ? (
+        <div className='max-h-96 overflow-auto p-3'>
+          <MarkdownViewer value={output.value} />
+        </div>
+      ) : null}
+      <div className='p-3'>
+        {output.kind === 'link' ? (
+          <a
+            href={output.value}
+            target='_blank'
+            rel='noreferrer'
+            className='text-primary inline-flex max-w-full items-center gap-2 font-semibold break-all underline-offset-4 hover:underline'
+          >
+            {output.value}
+            <ExternalLink className='h-4 w-4 shrink-0' aria-hidden />
+          </a>
+        ) : output.kind === 'image' || output.kind === 'video' ? (
+          <a
+            href={output.value}
+            target='_blank'
+            rel='noreferrer'
+            className='text-primary inline-flex max-w-full items-center gap-2 text-sm font-semibold break-all underline-offset-4 hover:underline'
+          >
+            Open source
+            <ExternalLink className='h-4 w-4 shrink-0' aria-hidden />
+          </a>
+        ) : (
+          <p className='text-foreground/55 text-xs'>
+            Text output rendered from the agent result.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function collectFinalOutputs(run: AgentRun) {
+  const outputs: AgentOutputItem[] = []
+  const seen = new Set<string>()
+
+  addOutput(outputs, seen, {
+    id: 'deliverable-video-url',
+    label: 'Synthesized video result',
+    source: 'Agent deliverables',
+    value: run.deliverables.videoResultUrl,
+    kind: classifyUrl(run.deliverables.videoResultUrl, 'videoResultUrl')
+  })
+
+  for (const action of run.actions) {
+    for (const output of collectActionOutputs(action)) {
+      addOutput(outputs, seen, {
+        ...output,
+        id: `final-${output.id}`
+      })
+    }
+  }
+
+  addOutput(outputs, seen, {
+    id: 'launch-brief',
+    label: 'Launch brief',
+    source: 'Agent synthesis',
+    value: run.deliverables.launchBrief,
+    kind: 'text'
+  })
+  addOutput(outputs, seen, {
+    id: 'developer-copy',
+    label: 'Developer copy',
+    source: 'Agent synthesis',
+    value: run.deliverables.developerCopy,
+    kind: 'text'
+  })
+  addOutput(outputs, seen, {
+    id: 'market-signal',
+    label: 'Market signal',
+    source: 'Agent synthesis',
+    value: run.deliverables.marketSignal,
+    kind: 'text'
+  })
+
+  return outputs
+}
+
+function collectActionOutputs(action: AgentRun['actions'][number]) {
+  if (!action.responsePayload) {
+    return []
+  }
+
+  const outputs: AgentOutputItem[] = []
+  const seen = new Set<string>()
+
+  for (const candidate of extractResponseOutputs(action.responsePayload)) {
+    addOutput(outputs, seen, {
+      id: `${action.id}-${candidate.path}`,
+      label: humanizePath(candidate.path),
+      source: action.productName,
+      value: candidate.value,
+      kind: candidate.kind
+    })
+  }
+
+  return outputs
+}
+
+function extractResponseOutputs(
+  value: unknown,
+  path = 'response',
+  depth = 0
+): ExtractedOutput[] {
+  if (depth > 5 || value == null) {
+    return []
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    const kind = classifyValue(trimmed, path)
+
+    if (!kind) {
+      return []
+    }
+
+    return [{ path, value: trimmed, kind }]
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) =>
+      extractResponseOutputs(item, `${path}.${index}`, depth + 1)
+    )
+  }
+
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).flatMap(
+      ([key, item]) => extractResponseOutputs(item, `${path}.${key}`, depth + 1)
+    )
+  }
+
+  return []
+}
+
+function addOutput(
+  outputs: AgentOutputItem[],
+  seen: Set<string>,
+  output: AgentOutputCandidate
+) {
+  if (!output.value) {
+    return
+  }
+
+  const value = output.value.trim()
+
+  if (!value || seen.has(`${output.kind}:${value}`)) {
+    return
+  }
+
+  seen.add(`${output.kind}:${value}`)
+  outputs.push({
+    ...output,
+    value,
+    kind: output.kind ?? classifyValue(value, output.label) ?? 'text'
+  })
+}
+
+function classifyValue(
+  value: string,
+  path: string
+): AgentOutputItem['kind'] | null {
+  if (isUrl(value)) {
+    return classifyUrl(value, path) ?? null
+  }
+
+  const lowerPath = path.toLowerCase()
+
+  if (
+    value.length >= 24 &&
+    /summary|brief|copy|signal|result|output|text|description|message|content/.test(
+      lowerPath
+    )
+  ) {
+    return 'text'
+  }
+
+  return null
+}
+
+function classifyUrl(
+  value: string | undefined,
+  path: string
+): AgentOutputItem['kind'] | undefined {
+  if (!value || !isUrl(value)) {
+    return undefined
+  }
+
+  const lowerUrl = value.toLowerCase().split('?')[0] ?? ''
+  const lowerPath = path.toLowerCase()
+
+  if (/\.(mp4|webm|mov|m4v|ogg|ogv)$/.test(lowerUrl)) {
+    return 'video'
+  }
+
+  if (/\.(png|jpe?g|gif|webp|svg|avif)$/.test(lowerUrl)) {
+    return 'image'
+  }
+
+  if (
+    /video|movie|render/.test(lowerPath) &&
+    !/thumbnail|image/.test(lowerPath)
+  ) {
+    return 'link'
+  }
+
+  if (/image|thumbnail|poster|preview/.test(lowerPath)) {
+    return 'image'
+  }
+
+  return 'link'
+}
+
+function isUrl(value: string) {
+  try {
+    const url = new URL(value)
+
+    return ['http:', 'https:'].includes(url.protocol)
+  } catch {
+    return false
+  }
+}
+
+function humanizePath(path: string) {
+  const key = path.split('.').at(-1) ?? path
+
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/^\d+$/, index => `Result ${Number(index) + 1}`)
+    .replace(/\b\w/g, char => char.toUpperCase())
 }
 
 function shorten(value: string) {

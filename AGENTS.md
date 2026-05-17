@@ -653,8 +653,10 @@ Before creating a new helper or service file:
   least one tool remains selected; `/agents/[runId]` funds production runs
   through the agent budget vault, executes the ranked plan, shows planner
   mode/model, selected and skipped tools, planner rationale, budget ledger,
-  receipt links, Markdown-rendered deliverables, unused refund controls, and
-  writes Morph proof attestations.
+  receipt links, per-tool request and response JSON, extracted tool output
+  previews, Markdown-rendered deliverables, a final output section that renders
+  detected text, image, video, and result-link deliverables, unused refund
+  controls, and writes Morph proof attestations.
 - `/proofs/[proofId]` publicly displays non-sensitive autonomous run proof
   metadata, proof hash, receipt IDs, budget funding and refund metadata, total
   USDC spend, attestation transaction, and Morph explorer link.
