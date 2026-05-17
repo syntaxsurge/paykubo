@@ -69,21 +69,17 @@ export const supportedViemChains = [appChains.morphHoodi.viemChain] as const
 export const defaultAppChain = appChains.morphHoodi
 export const x402Network = envClient.NEXT_PUBLIC_X402_NETWORK ?? 'eip155:2910'
 const defaultMorphHoodiTokenAddress =
-  '0xEcF966Cc754BC411E1F1106fbb4e343b835E85E4'
-const defaultMorphHoodiTokenDomainName = 'HoodiTestToken'
+  '0x7433b41C6c5e1d58D4Da99483609520255ab661B'
+const defaultMorphHoodiTokenDomainName = 'USDC'
 export const morphUsdcTokenAddress =
   envClient.NEXT_PUBLIC_USDC_TOKEN_ADDRESS ?? defaultMorphHoodiTokenAddress
 const configuredMorphUsdcTokenName = envClient.NEXT_PUBLIC_USDC_TOKEN_NAME
 export const morphUsdcTokenName =
-  morphUsdcTokenAddress.toLowerCase() ===
-    defaultMorphHoodiTokenAddress.toLowerCase() &&
-  (!configuredMorphUsdcTokenName || configuredMorphUsdcTokenName === 'USDC')
-    ? defaultMorphHoodiTokenDomainName
-    : (configuredMorphUsdcTokenName ?? defaultMorphHoodiTokenDomainName)
+  configuredMorphUsdcTokenName ?? defaultMorphHoodiTokenDomainName
 export const morphUsdcTokenVersion =
-  envClient.NEXT_PUBLIC_USDC_TOKEN_VERSION ?? '1.0'
+  envClient.NEXT_PUBLIC_USDC_TOKEN_VERSION ?? '2'
 export const morphUsdcTokenDecimals =
-  envClient.NEXT_PUBLIC_USDC_TOKEN_DECIMALS ?? 18
+  envClient.NEXT_PUBLIC_USDC_TOKEN_DECIMALS ?? 6
 
 export function toUsdcAssetAmount(amountUsd: number) {
   return {

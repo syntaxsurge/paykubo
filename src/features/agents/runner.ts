@@ -39,7 +39,11 @@ import {
   type MarketplaceReceipt
 } from '@/features/marketplace/receipts'
 import type { MarketplaceOrder } from '@/features/marketplace/types'
-import { defaultAppChain, morphUsdcTokenAddress } from '@/lib/config/chains'
+import {
+  defaultAppChain,
+  morphUsdcTokenAddress,
+  morphUsdcTokenDecimals
+} from '@/lib/config/chains'
 import {
   getAgentRunBytes32,
   getAgentRunVaultBudget,
@@ -1034,7 +1038,10 @@ async function ensureAgentCanPayWithPermit2(amountUsd: number) {
     throw new Error('AGENT_SPENDER_PRIVATE_KEY is not configured.')
   }
 
-  const requiredAmount = parseUnits(amountUsd.toFixed(6), 18)
+  const requiredAmount = parseUnits(
+    amountUsd.toFixed(Math.min(morphUsdcTokenDecimals, 6)),
+    morphUsdcTokenDecimals
+  )
 
   if (requiredAmount <= 0n) {
     return
@@ -1136,9 +1143,12 @@ async function waitForAgentPermit2Allowance({
 }
 
 function formatUsdcAmount(amount: bigint) {
-  return `${Number(formatUnits(amount, 18)).toLocaleString(undefined, {
-    maximumFractionDigits: 6
-  })} USDC`
+  return `${Number(formatUnits(amount, morphUsdcTokenDecimals)).toLocaleString(
+    undefined,
+    {
+      maximumFractionDigits: 6
+    }
+  )} USDC`
 }
 
 async function readJsonResponse(response: Response) {

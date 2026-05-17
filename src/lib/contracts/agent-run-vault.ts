@@ -16,6 +16,7 @@ import { buildExplorerUrl } from '@/features/marketplace/receipts'
 import {
   defaultAppChain,
   getExplorerAddressUrl,
+  morphUsdcTokenDecimals,
   morphUsdcTokenAddress
 } from '@/lib/config/chains'
 import { envClient } from '@/lib/env/env.client'
@@ -218,11 +219,14 @@ export function getAgentVaultPaymentId(runId: string, actionId: string) {
 }
 
 export function parseUsdcToAtomic(amountUsdc: number | string) {
-  return parseUnits(Number(amountUsdc).toFixed(6), 18)
+  return parseUnits(
+    Number(amountUsdc).toFixed(Math.min(morphUsdcTokenDecimals, 6)),
+    morphUsdcTokenDecimals
+  )
 }
 
 export function formatAtomicUsdc(amount: bigint) {
-  return `${Number(formatUnits(amount, 18)).toFixed(2)} USDC`
+  return `${Number(formatUnits(amount, morphUsdcTokenDecimals)).toFixed(2)} USDC`
 }
 
 export function getUsdcTokenAddress() {

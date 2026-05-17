@@ -12,7 +12,7 @@ import {
 import { privateKeyToAccount } from 'viem/accounts'
 
 import { buildExplorerUrl } from '@/features/marketplace/receipts'
-import { defaultAppChain } from '@/lib/config/chains'
+import { defaultAppChain, morphUsdcTokenDecimals } from '@/lib/config/chains'
 import { envServer } from '@/lib/env/env.server'
 
 type EscrowableProduct = {
@@ -111,7 +111,10 @@ export function getEscrowPaymentId(orderId: string, receiptId: string) {
 }
 
 export function toAtomicUsdcAmount(amountUsd: number) {
-  return parseUnits(amountUsd.toFixed(6), 18)
+  return parseUnits(
+    amountUsd.toFixed(Math.min(morphUsdcTokenDecimals, 6)),
+    morphUsdcTokenDecimals
+  )
 }
 
 export async function reserveEscrowPayment({

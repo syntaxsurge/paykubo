@@ -47,7 +47,11 @@ import {
 } from '@/features/marketplace/status'
 import type { MarketplaceOrder } from '@/features/marketplace/types'
 import { useAutoPolling } from '@/hooks/use-auto-polling'
-import { defaultAppChain, getExplorerTransactionUrl } from '@/lib/config/chains'
+import {
+  defaultAppChain,
+  getExplorerTransactionUrl,
+  morphUsdcTokenDecimals
+} from '@/lib/config/chains'
 import { walletProvider } from '@/lib/config/wallet'
 import { cn } from '@/lib/utils/cn'
 import { thirdwebActiveChain, thirdwebClient } from '@/lib/wallet/thirdweb'
@@ -147,7 +151,6 @@ type PaidProductCallBody = PaidApiErrorBody & {
 const usdcBalanceAbi = parseAbi([
   'function balanceOf(address owner) view returns (uint256)'
 ])
-const USDC_DECIMALS = 18
 const ASYNC_JOB_POLL_INTERVAL_MS = 8000
 const TRANSIENT_RETRY_ATTEMPTS = 3
 const TRANSIENT_RETRY_BASE_DELAY_MS = 900
@@ -2445,9 +2448,12 @@ function shortenHash(value: string) {
 }
 
 function formatUsdcAmount(amount: bigint) {
-  return Number(formatUnits(amount, USDC_DECIMALS)).toLocaleString(undefined, {
-    maximumFractionDigits: 6
-  })
+  return Number(formatUnits(amount, morphUsdcTokenDecimals)).toLocaleString(
+    undefined,
+    {
+      maximumFractionDigits: 6
+    }
+  )
 }
 
 async function readResponseBody(response: Response) {

@@ -652,15 +652,15 @@ Before creating a new helper or service file:
   provider dashboards and usage pages count autonomous tool calls in the same
   revenue ledger as browser and developer API calls. Morph Hoodi x402 payment
   requirements use the settlement token's EIP-712 domain metadata in
-  `NEXT_PUBLIC_USDC_TOKEN_NAME` and `NEXT_PUBLIC_USDC_TOKEN_VERSION`; the known
-  Morph Hoodi settlement token is normalized to its deployed `HoodiTestToken`
-  EIP-712 domain if the env is absent or still set to the display label `USDC`.
-  The public UI still labels the settlement asset as USDC, but signed x402
-  payloads must match the deployed Hoodi token domain for facilitator
-  verification and settlement. Vault spend and refund writes wait for successful
-  transaction receipts, and refund recovery reads the vault's live spent amount
-  before calling `recordSpendRefund` so retries and partially recovered failures
-  do not request a larger refund than the current vault state can accept. Direct
+  `NEXT_PUBLIC_USDC_TOKEN_NAME`, `NEXT_PUBLIC_USDC_TOKEN_VERSION`, and
+  `NEXT_PUBLIC_USDC_TOKEN_DECIMALS`; the Morph Hoodi settlement token is USDC at
+  `0x7433b41C6c5e1d58D4Da99483609520255ab661B` with EIP-712 version `2` and 6
+  decimals. Signed x402 payloads, Permit2 checks, agent vault funding, and
+  escrow reserves must use that token metadata for facilitator verification and
+  settlement. Vault spend and refund writes wait for successful transaction
+  receipts, and refund recovery reads the vault's live spent amount before
+  calling `recordSpendRefund` so retries and partially recovered failures do not
+  request a larger refund than the current vault state can accept. Direct
   run reads refresh from Convex by run ID before using the in-memory run cache so
   polling clients see the latest persisted progress across server runtimes.
   Agent action progress records the settled x402
