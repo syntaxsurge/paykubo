@@ -619,7 +619,10 @@ Before creating a new helper or service file:
   fund the `AgentRunVault` with USDC before the configured agent signer can
   execute x402 paid actions. The run detail client funds through the browser
   EIP-1193 wallet provider, requests the MetaMask account when needed, switches
-  or adds Morph Hoodi, submits the USDC approval, then submits `fundRun`.
+  or adds Morph Hoodi, checks the connected wallet's settlement-token balance
+  and vault allowance, submits the USDC approval when needed, verifies receipt
+  success, then submits `fundRun` and verifies the funding receipt before
+  confirming the run server-side.
   Funding confirmation and execution both verify the run against the current
   deployed vault's `budgetOf` state, so stale local funding records from an old
   vault reset to an unfunded state instead of attempting `recordSpend`. Before

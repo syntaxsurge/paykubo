@@ -24,6 +24,7 @@ import {
 import {
   createPublicClient,
   encodeFunctionData,
+  formatUnits,
   http,
   isAddress,
   numberToHex,
@@ -225,18 +226,69 @@ function AgentRunContent({
       }
 
       setRun(prepared.run)
-      setStatus('Open MetaMask and approve USDC for the agent run vault.')
-      const approvalTxHash = await sendBrowserWalletTransaction({
-        from: fundingWallet,
-        to: prepared.funding.tokenAddress,
-        data: encodeFunctionData({
-          abi: erc20ApprovalAbi,
-          functionName: 'approve',
-          args: [prepared.funding.vaultAddress, BigInt(prepared.funding.amount)]
-        })
+      const requiredAmount = BigInt(prepared.funding.amount)
+      const tokenState = await readFundingTokenState({
+        tokenAddress: prepared.funding.tokenAddress,
+        ownerAddress: fundingWallet,
+        spenderAddress: prepared.funding.vaultAddress
       })
 
-      await publicClient.waitForTransactionReceipt({ hash: approvalTxHash })
+      if (tokenState.balance < requiredAmount) {
+        throw new Error(
+          `Your connected wallet has ${formatTokenAmount(
+            tokenState.balance,
+            tokenState.decimals,
+            tokenState.symbol
+          )}, but this run needs ${formatTokenAmount(
+            requiredAmount,
+            tokenState.decimals,
+            tokenState.symbol
+          )}. Fund the wallet with the Morph Hoodi settlement token, then try again.`
+        )
+      }
+
+      let approvalTxHash: Hex | undefined
+
+      if (tokenState.allowance < requiredAmount) {
+        setStatus('Open MetaMask and approve USDC for the agent run vault.')
+        approvalTxHash = await sendBrowserWalletTransaction({
+          from: fundingWallet,
+          to: prepared.funding.tokenAddress,
+          data: encodeFunctionData({
+            abi: erc20ApprovalAbi,
+            functionName: 'approve',
+            args: [
+              prepared.funding.vaultAddress,
+              BigInt(prepared.funding.amount)
+            ]
+          })
+        })
+
+        await waitForSuccessfulTransaction(
+          approvalTxHash,
+          'USDC approval transaction reverted.'
+        )
+
+        const nextAllowance = await readFundingTokenAllowance({
+          tokenAddress: prepared.funding.tokenAddress,
+          ownerAddress: fundingWallet,
+          spenderAddress: prepared.funding.vaultAddress
+        })
+
+        if (nextAllowance < requiredAmount) {
+          throw new Error(
+            `The approval transaction completed, but the vault allowance is only ${formatTokenAmount(
+              nextAllowance,
+              tokenState.decimals,
+              tokenState.symbol
+            )}. Approve the full ${formatTokenAmount(
+              requiredAmount,
+              tokenState.decimals,
+              tokenState.symbol
+            )} budget before funding.`
+          )
+        }
+      }
 
       setStatus('Open MetaMask again to fund the agent run vault.')
       const fundingTxHash = await sendBrowserWalletTransaction({
@@ -255,7 +307,10 @@ function AgentRunContent({
         })
       })
 
-      await publicClient.waitForTransactionReceipt({ hash: fundingTxHash })
+      await waitForSuccessfulTransaction(
+        fundingTxHash,
+        'AgentRunVault funding transaction reverted.'
+      )
 
       const confirmResponse = await fetch(
         `/api/agents/runs/${runId}/funding/confirm`,
@@ -530,6 +585,85 @@ async function sendBrowserWalletTransaction({
   }
 
   return txHash as Hex
+}
+
+async function readFundingTokenState({
+  tokenAddress,
+  ownerAddress,
+  spenderAddress
+}: {
+  tokenAddress: Address
+  ownerAddress: Address
+  spenderAddress: Address
+}) {
+  const [balance, allowance, decimals, symbol] = await Promise.all([
+    publicClient.readContract({
+      address: tokenAddress,
+      abi: erc20ApprovalAbi,
+      functionName: 'balanceOf',
+      args: [ownerAddress]
+    }),
+    readFundingTokenAllowance({
+      tokenAddress,
+      ownerAddress,
+      spenderAddress
+    }),
+    publicClient.readContract({
+      address: tokenAddress,
+      abi: erc20ApprovalAbi,
+      functionName: 'decimals'
+    }),
+    publicClient
+      .readContract({
+        address: tokenAddress,
+        abi: erc20ApprovalAbi,
+        functionName: 'symbol'
+      })
+      .catch(() => 'USDC')
+  ])
+
+  return {
+    balance,
+    allowance,
+    decimals,
+    symbol
+  }
+}
+
+async function readFundingTokenAllowance({
+  tokenAddress,
+  ownerAddress,
+  spenderAddress
+}: {
+  tokenAddress: Address
+  ownerAddress: Address
+  spenderAddress: Address
+}) {
+  return await publicClient.readContract({
+    address: tokenAddress,
+    abi: erc20ApprovalAbi,
+    functionName: 'allowance',
+    args: [ownerAddress, spenderAddress]
+  })
+}
+
+async function waitForSuccessfulTransaction(
+  txHash: Hex,
+  revertedMessage: string
+) {
+  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+
+  if (receipt.status !== 'success') {
+    throw new Error(`${revertedMessage} Transaction hash: ${txHash}`)
+  }
+
+  return receipt
+}
+
+function formatTokenAmount(amount: bigint, decimals: number, symbol: string) {
+  return `${Number(formatUnits(amount, decimals)).toLocaleString(undefined, {
+    maximumFractionDigits: 6
+  })} ${symbol}`
 }
 
 async function ensureBrowserWalletChain(provider: EthereumProvider) {
