@@ -4,15 +4,19 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
+  Activity,
   AlertTriangle,
   Bot,
+  Braces,
   CheckCircle2,
   CircleDollarSign,
   Clock,
   ExternalLink,
   FileCheck2,
   History,
+  Link2,
   type LucideIcon,
+  Network,
   Play,
   ReceiptText,
   RefreshCw,
@@ -71,6 +75,10 @@ type ExtractedOutput = {
   value: string
   kind: AgentOutputItem['kind']
 }
+
+type AgentAsyncPoll = NonNullable<
+  AgentRun['actions'][number]['asyncPollingResponses']
+>[number]
 
 type AgentRunClientProps = {
   runId: string
@@ -1189,9 +1197,10 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
         ? AlertTriangle
         : Clock
   const outputItems = collectActionOutputs(action)
+  const latestPoll = action.asyncPollingResponses?.at(-1)
 
   return (
-    <div className='border-border bg-background/60 rounded-lg border p-4'>
+    <div className='border-border bg-background/55 rounded-lg border p-4 shadow-sm'>
       <div className='flex flex-wrap items-start justify-between gap-3'>
         <div className='min-w-0'>
           <div className='flex items-center gap-2'>
@@ -1202,10 +1211,14 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
             {action.providerName} - {action.amountUsdc}
           </p>
         </div>
-        <span className='bg-muted rounded-md px-2 py-1 text-xs font-semibold'>
-          {agentActionStatusLabels[action.status]}
-        </span>
+        <div className='flex flex-wrap items-center justify-end gap-2'>
+          <ActionLinks action={action} />
+          <span className='bg-muted rounded-md px-2 py-1 text-xs font-semibold'>
+            {agentActionStatusLabels[action.status]}
+          </span>
+        </div>
       </div>
+      {latestPoll ? <LatestPollStrip poll={latestPoll} /> : null}
       {action.errorMessage ? (
         <p className='mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm leading-6 text-red-600 dark:text-red-300'>
           {action.errorMessage}
@@ -1221,72 +1234,243 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
           </p>
         </details>
       ) : null}
-      {action.receipt ? (
-        <div className='mt-3 grid gap-3 text-sm md:grid-cols-3'>
-          <Link
-            href={`/receipts/${action.receipt.id}`}
-            className='border-border rounded-lg border p-3 font-semibold underline-offset-4 hover:underline'
-          >
-            <ReceiptText className='text-primary mb-2 h-4 w-4' aria-hidden />
-            {action.receipt.id}
-          </Link>
-          <span className='border-border rounded-lg border p-3'>
-            {action.receipt.network}
-          </span>
-          {action.receipt.explorerUrl ? (
-            <a
-              href={action.receipt.explorerUrl}
-              target='_blank'
-              rel='noreferrer'
-              className='border-border text-primary rounded-lg border p-3 font-semibold underline-offset-4 hover:underline'
-            >
-              View settlement
-            </a>
-          ) : null}
-        </div>
-      ) : null}
       {outputItems.length > 0 ? (
         <div className='mt-4'>
-          <p className='text-foreground/60 text-xs tracking-[0.14em] uppercase'>
-            Tool output
-          </p>
+          <SectionLabel icon={Link2} label='Tool output' />
           <OutputGallery outputs={outputItems} className='mt-3' compact />
         </div>
       ) : null}
-      <div className='mt-4 grid gap-3 lg:grid-cols-2'>
-        <JsonViewer
-          title='Tool request'
-          value={action.requestPayload}
-          defaultOpen={false}
-          copyLabel='Copy request'
-        />
-        <JsonViewer
-          title='Tool response'
-          value={
-            action.responsePayload ?? {
-              status: action.status,
-              message:
-                action.errorMessage ??
-                (action.status === 'paid'
-                  ? 'The paid request is running. Paykubo is waiting for the provider response.'
-                  : 'No response payload recorded yet.')
-            }
-          }
-          defaultOpen={false}
-          copyLabel='Copy response'
-        />
-      </div>
       {action.asyncPollingResponses?.length ? (
-        <div className='mt-3'>
+        <AsyncPollingPanel action={action} />
+      ) : null}
+      <details className='border-border/70 bg-muted/20 mt-4 rounded-lg border'>
+        <summary className='flex cursor-pointer list-none items-center justify-between gap-3 p-3 text-sm font-semibold [&::-webkit-details-marker]:hidden'>
+          <span className='flex items-center gap-2'>
+            <Braces className='text-primary h-4 w-4' aria-hidden />
+            Request and response JSON
+          </span>
+          <span className='text-foreground/50 text-xs'>Expand</span>
+        </summary>
+        <div className='border-border/70 grid gap-3 border-t p-3 lg:grid-cols-2'>
+          <JsonViewer
+            title='Tool request'
+            value={action.requestPayload}
+            defaultOpen={false}
+            copyLabel='Copy request'
+          />
+          <JsonViewer
+            title='Tool response'
+            value={
+              action.responsePayload ?? {
+                status: action.status,
+                message:
+                  action.errorMessage ??
+                  (action.status === 'paid'
+                    ? 'The paid request is running. Paykubo is waiting for the provider response.'
+                    : 'No response payload recorded yet.')
+              }
+            }
+            defaultOpen={false}
+            copyLabel='Copy response'
+          />
+        </div>
+      </details>
+    </div>
+  )
+}
+
+function ActionLinks({ action }: { action: AgentRun['actions'][number] }) {
+  const links = [
+    action.receipt
+      ? {
+          label: 'Receipt',
+          href: `/receipts/${action.receipt.id}`,
+          icon: ReceiptText
+        }
+      : null,
+    action.receipt?.explorerUrl
+      ? {
+          label: 'Settlement',
+          href: action.receipt.explorerUrl,
+          icon: ExternalLink,
+          external: true
+        }
+      : null,
+    action.vaultSpendExplorerUrl
+      ? {
+          label: 'Vault spend',
+          href: action.vaultSpendExplorerUrl,
+          icon: Network,
+          external: true
+        }
+      : null
+  ].filter(Boolean) as Array<{
+    label: string
+    href: string
+    icon: LucideIcon
+    external?: boolean
+  }>
+
+  if (!links.length) {
+    return null
+  }
+
+  return (
+    <div className='flex items-center gap-1'>
+      {links.map(({ label, href, icon: Icon, external }) => {
+        const classes =
+          'border-border bg-card/70 text-foreground/75 hover:text-primary hover:border-primary/50 inline-flex h-9 w-9 items-center justify-center rounded-lg border transition'
+
+        return external ? (
+          <a
+            key={label}
+            href={href}
+            target='_blank'
+            rel='noreferrer'
+            className={classes}
+            title={label}
+            aria-label={label}
+          >
+            <Icon className='h-4 w-4' aria-hidden />
+          </a>
+        ) : (
+          <Link
+            key={label}
+            href={href}
+            className={classes}
+            title={label}
+            aria-label={label}
+          >
+            <Icon className='h-4 w-4' aria-hidden />
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
+
+function LatestPollStrip({ poll }: { poll: AgentAsyncPoll }) {
+  return (
+    <div className='border-border/70 bg-muted/20 mt-3 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs'>
+      <span className='text-primary inline-flex items-center gap-1 font-semibold'>
+        <Activity className='h-3.5 w-3.5' aria-hidden />
+        Poll {poll.attempt}
+      </span>
+      <span className='text-foreground/60'>
+        {poll.orderStatus ?? 'status pending'}
+      </span>
+      {poll.resultReleaseStatus ? (
+        <span className='text-foreground/50'>{poll.resultReleaseStatus}</span>
+      ) : null}
+      <span className='text-foreground/45 ml-auto'>
+        {new Date(poll.polledAt).toLocaleTimeString()}
+      </span>
+    </div>
+  )
+}
+
+function AsyncPollingPanel({
+  action
+}: {
+  action: AgentRun['actions'][number]
+}) {
+  const polls = action.asyncPollingResponses ?? []
+
+  if (!polls.length) {
+    return null
+  }
+
+  return (
+    <div className='border-border/80 bg-card/45 mt-4 overflow-hidden rounded-lg border'>
+      <div className='border-border/70 flex flex-wrap items-center justify-between gap-3 border-b p-3'>
+        <SectionLabel icon={Activity} label='Async polling' />
+        <span className='bg-muted rounded-md px-2 py-1 text-xs font-semibold'>
+          {polls.length} response{polls.length === 1 ? '' : 's'}
+        </span>
+      </div>
+      <div className='grid gap-2 p-3'>
+        {polls.map(poll => (
+          <PollingRow key={poll.id} poll={poll} />
+        ))}
+      </div>
+      <details className='border-border/70 border-t'>
+        <summary className='flex cursor-pointer list-none items-center justify-between gap-3 p-3 text-sm font-semibold [&::-webkit-details-marker]:hidden'>
+          <span className='flex items-center gap-2'>
+            <Braces className='text-primary h-4 w-4' aria-hidden />
+            Raw polling JSON
+          </span>
+          <span className='text-foreground/50 text-xs'>Expand</span>
+        </summary>
+        <div className='border-border/70 border-t p-3'>
           <JsonViewer
             title='Async polling responses'
-            value={action.asyncPollingResponses}
-            defaultOpen={action.status === 'paid'}
+            value={polls}
+            defaultOpen={false}
             copyLabel='Copy polling responses'
           />
         </div>
-      ) : null}
+      </details>
     </div>
+  )
+}
+
+function PollingRow({ poll }: { poll: AgentAsyncPoll }) {
+  return (
+    <div className='border-border/70 bg-background/45 grid gap-2 rounded-lg border p-3 text-sm md:grid-cols-[96px_minmax(0,1fr)_auto] md:items-center'>
+      <div className='font-semibold'>Poll {poll.attempt}</div>
+      <div className='min-w-0'>
+        <div className='flex flex-wrap items-center gap-2'>
+          <span className='bg-primary/10 text-primary rounded-md px-2 py-1 text-xs font-semibold'>
+            HTTP {poll.httpStatus}
+          </span>
+          {poll.orderStatus ? (
+            <span className='bg-muted rounded-md px-2 py-1 text-xs font-semibold'>
+              {poll.orderStatus}
+            </span>
+          ) : null}
+          {poll.resultReleaseStatus ? (
+            <span className='text-foreground/60 text-xs'>
+              {poll.resultReleaseStatus}
+            </span>
+          ) : null}
+        </div>
+        <p className='text-foreground/50 mt-1 truncate text-xs'>
+          {poll.externalJobId ?? 'No provider job id yet'}
+        </p>
+      </div>
+      <div className='flex items-center gap-2 md:justify-end'>
+        <span className='text-foreground/50 text-xs'>
+          {new Date(poll.polledAt).toLocaleTimeString()}
+        </span>
+        {poll.resultUrl ? (
+          <a
+            href={poll.resultUrl}
+            target='_blank'
+            rel='noreferrer'
+            className='border-border bg-card/70 text-primary inline-flex h-8 w-8 items-center justify-center rounded-lg border'
+            title='Open result'
+            aria-label='Open result'
+          >
+            <ExternalLink className='h-4 w-4' aria-hidden />
+          </a>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function SectionLabel({
+  icon: Icon,
+  label
+}: {
+  icon: LucideIcon
+  label: string
+}) {
+  return (
+    <p className='text-foreground/60 flex items-center gap-2 text-xs font-semibold tracking-[0.14em] uppercase'>
+      <Icon className='text-primary h-4 w-4' aria-hidden />
+      {label}
+    </p>
   )
 }
 
@@ -1396,7 +1580,7 @@ function OutputPreview({
   compact?: boolean
 }) {
   return (
-    <div className='border-border bg-background/60 overflow-hidden rounded-lg border'>
+    <div className='border-border bg-background/50 overflow-hidden rounded-lg border'>
       <div className='border-border/80 flex flex-wrap items-start justify-between gap-2 border-b p-3'>
         <div className='min-w-0'>
           <p className='font-semibold break-words'>{output.label}</p>
@@ -1435,15 +1619,7 @@ function OutputPreview({
       ) : null}
       <div className='p-3'>
         {output.kind === 'link' ? (
-          <a
-            href={output.value}
-            target='_blank'
-            rel='noreferrer'
-            className='text-primary inline-flex max-w-full items-center gap-2 font-semibold break-all underline-offset-4 hover:underline'
-          >
-            {output.value}
-            <ExternalLink className='h-4 w-4 shrink-0' aria-hidden />
-          </a>
+          <CompactLinkPreview href={output.value} />
         ) : output.kind === 'image' || output.kind === 'video' ? (
           <a
             href={output.value}
@@ -1462,6 +1638,46 @@ function OutputPreview({
       </div>
     </div>
   )
+}
+
+function CompactLinkPreview({ href }: { href: string }) {
+  const url = formatDisplayUrl(href)
+
+  return (
+    <a
+      href={href}
+      target='_blank'
+      rel='noreferrer'
+      className='group flex min-w-0 items-center gap-3 rounded-lg text-sm'
+    >
+      <span className='bg-primary/10 text-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-lg'>
+        <ExternalLink className='h-4 w-4' aria-hidden />
+      </span>
+      <span className='min-w-0'>
+        <span className='block truncate font-semibold'>{url.host}</span>
+        <span className='text-foreground/55 group-hover:text-primary block truncate text-xs'>
+          {url.path}
+        </span>
+      </span>
+    </a>
+  )
+}
+
+function formatDisplayUrl(href: string) {
+  try {
+    const url = new URL(href)
+    const path = `${url.pathname}${url.search}`
+
+    return {
+      host: url.host,
+      path: path.length > 1 ? path : url.protocol.replace(':', '')
+    }
+  } catch {
+    return {
+      host: 'Link',
+      path: shorten(href)
+    }
+  }
 }
 
 function collectFinalOutputs(run: AgentRun) {
@@ -1519,9 +1735,13 @@ function collectActionOutputs(action: AgentRun['actions'][number]) {
   const seen = new Set<string>()
 
   for (const candidate of extractResponseOutputs(action.responsePayload)) {
+    if (!shouldSurfaceOutputCandidate(candidate.path, candidate.value)) {
+      continue
+    }
+
     addOutput(outputs, seen, {
       id: `${action.id}-${candidate.path}`,
-      label: humanizePath(candidate.path),
+      label: formatOutputLabel(candidate.path),
       source: action.productName,
       value: candidate.value,
       kind: candidate.kind
@@ -1529,6 +1749,52 @@ function collectActionOutputs(action: AgentRun['actions'][number]) {
   }
 
   return outputs
+}
+
+function shouldSurfaceOutputCandidate(path: string, value: string) {
+  const lowerPath = path.toLowerCase()
+
+  if (
+    /explorer|settlement|escrow|receipt|txhash|transaction|vault/.test(
+      lowerPath
+    )
+  ) {
+    return false
+  }
+
+  if (!isUrl(value)) {
+    return true
+  }
+
+  return /result|render|preview|project|clone|output|job|url|image|video/.test(
+    lowerPath
+  )
+}
+
+function formatOutputLabel(path: string) {
+  const key = path.split('.').at(-1)?.toLowerCase() ?? path.toLowerCase()
+
+  if (key === 'url') {
+    return 'Provider job'
+  }
+
+  if (key === 'resulturl') {
+    return 'Result'
+  }
+
+  if (key === 'renderurl') {
+    return 'Rendered video'
+  }
+
+  if (key === 'previewurl') {
+    return 'Preview'
+  }
+
+  if (key === 'projecturl' || key === 'publicprojecturl') {
+    return 'Project'
+  }
+
+  return humanizePath(path)
 }
 
 function extractResponseOutputs(

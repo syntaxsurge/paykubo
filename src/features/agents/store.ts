@@ -65,12 +65,6 @@ export async function listAgentRuns() {
 export async function getAgentRun(runId: string) {
   await loadAgentRuns()
 
-  const cachedRun = runs.get(runId)
-
-  if (cachedRun) {
-    return cachedRun
-  }
-
   const persistedRun = await getConvexClient()
     .query(api.agentState.getRun, { runKey: runId })
     .catch(() => null)
@@ -81,7 +75,7 @@ export async function getAgentRun(runId: string) {
     return persistedRun
   }
 
-  return undefined
+  return runs.get(runId)
 }
 
 export async function getAgentProof(proofId: string) {
