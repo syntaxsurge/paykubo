@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import * as React from 'react'
 
-import { ExternalLink, Loader2, MoreVertical, Trash2 } from 'lucide-react'
+import { Loader2, MoreVertical, Settings, Trash2 } from 'lucide-react'
 import { useRouter } from 'nextjs-toploader/app'
 
 import {
@@ -12,19 +12,41 @@ import {
 } from '@/components/data-display/server-data-table-dom'
 import { Button, buttonClasses } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
-import type { AgentRun } from '@/features/agents/types'
+import type { ApiProduct } from '@/features/marketplace/products'
 
-export function AgentRunRowActions({ run }: { run: AgentRun }) {
+export function ProviderProductRowActions({
+  product
+}: {
+  product: ApiProduct
+}) {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = React.useState(false)
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [isDeleting, setIsDeleting] = React.useState(false)
   const [error, setError] = React.useState('')
   const menuRef = React.useRef<HTMLDivElement>(null)
+  const buttonRef = React.useRef<HTMLButtonElement>(null)
+  const [menuPosition, setMenuPosition] = React.useState<{
+    top: number
+    right: number
+  } | null>(null)
 
   React.useEffect(() => {
     if (!menuOpen) {
       return
+    }
+
+    function syncMenuPosition() {
+      const rect = buttonRef.current?.getBoundingClientRect()
+
+      if (!rect) {
+        return
+      }
+
+      setMenuPosition({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right
+      })
     }
 
     function handlePointerDown(event: PointerEvent) {
@@ -33,38 +55,46 @@ export function AgentRunRowActions({ run }: { run: AgentRun }) {
       }
     }
 
+    syncMenuPosition()
     window.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('resize', syncMenuPosition)
+    window.addEventListener('scroll', syncMenuPosition, true)
 
     return () => {
       window.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('resize', syncMenuPosition)
+      window.removeEventListener('scroll', syncMenuPosition, true)
     }
   }, [menuOpen])
 
-  async function deleteRun() {
+  async function deleteProduct() {
     setIsDeleting(true)
     setError('')
 
     try {
-      const response = await fetch(`/api/agents/runs/${run.id}`, {
-        method: 'DELETE'
-      })
+      const response = await fetch(
+        `/api/providers/self/products/${encodeURIComponent(product.slug)}`,
+        {
+          method: 'DELETE',
+          headers: { Accept: 'application/json' }
+        }
+      )
       const body = (await response.json().catch(() => null)) as {
         error?: string
       } | null
 
       if (!response.ok) {
-        throw new Error(body?.error ?? 'Unable to delete this agent run.')
+        throw new Error(body?.error ?? 'Unable to delete this API product.')
       }
 
-      window.sessionStorage.removeItem(`app:agent-run:${run.id}`)
       const row = document.querySelector(
-        `[data-table-row-id="${CSS.escape(run.id)}"]`
+        `[data-table-row-id="${CSS.escape(product.slug)}"]`
       )
       const tableId = row
         ?.closest('[data-server-table-id]')
         ?.getAttribute('data-server-table-id')
 
-      removeServerDataTableRowsFromDom([run.id])
+      removeServerDataTableRowsFromDom([product.slug])
       if (tableId) {
         updateServerDataTableResultCount(tableId, 1)
       }
@@ -74,21 +104,39 @@ export function AgentRunRowActions({ run }: { run: AgentRun }) {
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : 'Unable to delete this agent run.'
+          : 'Unable to delete this API product.'
       )
     } finally {
       setIsDeleting(false)
     }
   }
 
+  function toggleMenu() {
+    const nextOpen = !menuOpen
+
+    if (nextOpen) {
+      const rect = buttonRef.current?.getBoundingClientRect()
+
+      if (rect) {
+        setMenuPosition({
+          top: rect.bottom + 8,
+          right: window.innerWidth - rect.right
+        })
+      }
+    }
+
+    setMenuOpen(nextOpen)
+  }
+
   return (
     <div className='relative' ref={menuRef}>
       <button
+        ref={buttonRef}
         type='button'
-        aria-label={`Open actions for ${run.title}`}
+        aria-label={`Open actions for ${product.name}`}
         aria-haspopup='menu'
         aria-expanded={menuOpen}
-        onClick={() => setMenuOpen(open => !open)}
+        onClick={toggleMenu}
         className={buttonClasses({
           variant: 'ghost',
           size: 'sm',
@@ -101,16 +149,21 @@ export function AgentRunRowActions({ run }: { run: AgentRun }) {
       {menuOpen ? (
         <div
           role='menu'
-          className='border-border bg-card absolute right-0 z-20 mt-2 w-44 rounded-lg border p-1 shadow-xl'
+          style={
+            menuPosition
+              ? { top: menuPosition.top, right: menuPosition.right }
+              : undefined
+          }
+          className='border-border bg-card fixed z-50 w-48 rounded-lg border p-1 text-left shadow-xl'
         >
           <Link
-            href={`/agents/${run.id}`}
+            href={`/provider/products/${product.slug}`}
             role='menuitem'
             className='hover:bg-muted flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm'
             onClick={() => setMenuOpen(false)}
           >
-            <ExternalLink className='h-4 w-4' aria-hidden />
-            Open run
+            <Settings className='h-4 w-4' aria-hidden />
+            Manage listing
           </Link>
           <button
             type='button'
@@ -122,7 +175,7 @@ export function AgentRunRowActions({ run }: { run: AgentRun }) {
             className='hover:bg-muted flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-red-600 dark:text-red-400'
           >
             <Trash2 className='h-4 w-4' aria-hidden />
-            Delete run
+            Delete listing
           </button>
         </div>
       ) : null}
@@ -135,19 +188,20 @@ export function AgentRunRowActions({ run }: { run: AgentRun }) {
             setError('')
           }
         }}
-        title='Delete agent run'
-        description='This removes the run from recent agent runs and stops future execution.'
+        title='Delete API product'
+        description='This removes the provider-created listing from product management and marketplace discovery.'
         className='max-w-xl'
       >
         <div className='space-y-5'>
           <div className='rounded-lg border border-red-500/25 bg-red-500/10 p-4'>
-            <p className='font-semibold'>Delete {run.title}?</p>
-            <p className='text-foreground/65 mt-2 text-sm leading-6'>
-              If this run has unused budget, the gateway will attempt to cancel
-              the run and refund the remaining vault balance.
+            <p className='font-semibold'>Delete {product.name}?</p>
+            <p className='text-muted-foreground mt-2 text-sm leading-6'>
+              Existing receipts and historical orders remain available, but
+              buyers and agents will no longer be able to discover or call this
+              listing.
             </p>
-            <p className='text-foreground/70 mt-3 font-mono text-xs break-all'>
-              {run.id}
+            <p className='text-muted-foreground mt-3 font-mono text-xs break-all'>
+              {product.slug}
             </p>
           </div>
 
@@ -172,15 +226,15 @@ export function AgentRunRowActions({ run }: { run: AgentRun }) {
             <Button
               type='button'
               disabled={isDeleting}
-              className='bg-red-600 text-white hover:bg-red-700'
-              onClick={() => void deleteRun()}
+              className='bg-red-600 text-white shadow-red-950/20 hover:bg-red-700'
+              onClick={() => void deleteProduct()}
             >
               {isDeleting ? (
                 <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
               ) : (
                 <Trash2 className='h-4 w-4' aria-hidden />
               )}
-              Delete run
+              Delete listing
             </Button>
           </div>
         </div>

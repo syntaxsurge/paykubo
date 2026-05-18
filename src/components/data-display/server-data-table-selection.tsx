@@ -5,6 +5,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Loader2, Trash2 } from 'lucide-react'
 import { useRouter } from 'nextjs-toploader/app'
 
+import {
+  removeServerDataTableRowsFromDom,
+  updateServerDataTableResultCount
+} from '@/components/data-display/server-data-table-dom'
 import { notifyServerTableSelectionUpdated } from '@/components/data-display/server-data-table-master-checkbox'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
@@ -149,6 +153,7 @@ export function ServerDataTableSelection({
 
       const body = (await response.json().catch(() => null)) as {
         error?: string
+        deletedIds?: string[]
         deletedRunIds?: string[]
       } | null
 
@@ -156,9 +161,11 @@ export function ServerDataTableSelection({
         throw new Error(body?.error ?? 'Bulk action failed.')
       }
 
-      removeRowsFromDom(ids)
-      removeAgentRunSessionStorage(body?.deletedRunIds ?? ids)
-      updateResultCount(tableId, ids.length)
+      const deletedIds = body?.deletedIds ?? body?.deletedRunIds ?? ids
+
+      removeServerDataTableRowsFromDom(deletedIds)
+      removeAgentRunSessionStorage(body?.deletedRunIds ?? deletedIds)
+      updateServerDataTableResultCount(tableId, deletedIds.length)
       updateSelection([])
       setPendingAction(null)
       router.refresh()
@@ -337,30 +344,8 @@ function dedupeIds(ids: string[]) {
   return Array.from(new Set(ids))
 }
 
-function removeRowsFromDom(ids: string[]) {
-  ids.forEach(id => {
-    document.querySelector(`[data-table-row-id="${CSS.escape(id)}"]`)?.remove()
-  })
-}
-
 function removeAgentRunSessionStorage(ids: string[]) {
   ids.forEach(id => {
     window.sessionStorage.removeItem(`app:agent-run:${id}`)
   })
-}
-
-function updateResultCount(tableId: string, removedCount: number) {
-  const element = document.querySelector<HTMLElement>(
-    `[data-table-result-count="${CSS.escape(tableId)}"]`
-  )
-
-  if (!element) {
-    return
-  }
-
-  const current = Number(element.dataset.tableTotalRows ?? 0)
-  const next = Math.max(0, current - removedCount)
-
-  element.dataset.tableTotalRows = String(next)
-  element.textContent = `${next.toLocaleString()} result${next === 1 ? '' : 's'}`
 }

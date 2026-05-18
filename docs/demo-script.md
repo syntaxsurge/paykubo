@@ -34,7 +34,7 @@ Word count: 93
 
 - **Show:** cliplore.ai OpenAPI URL, API key page, then Paykubo provider
   product form.
-- **Voiceover:** I copy ClipLore's OpenAPI URL first, then generate an API key.
+- **Voiceover:** I copy ClipLore's OpenAPI URL, then generate an API key.
   In Paykubo, I import the spec, choose the video job endpoint, add the key
   server-side, price it in USDC, and publish it as agent-ready.
 
@@ -42,7 +42,7 @@ Word count: 93
 
 - **Show:** `/marketplace`, ClipLore product, `/orders/new`, payment console,
   completed order, and result link.
-- **Voiceover:** A buyer opens the marketplace, runs the ClipLore video tool, and pays through x402. Paykubo settles USDC on Morph, then returns the ClipLore output link.
+- **Voiceover:** A buyer opens the marketplace, runs the ClipLore, and pays through x402. Paykubo settles USDC on Morph, then returns the ClipLore output link.
 
 ### 4.) 1:10-1:35 - Run The Agent
 

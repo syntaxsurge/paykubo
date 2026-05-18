@@ -623,7 +623,10 @@ Before creating a new helper or service file:
   user profile instead of accepting owner wallet, receiving wallet, or provider
   display name in the listing form. Provider dashboards and product management
   filter by the profile wallet stored on each product, and payout settlement
-  uses the same profile wallet.
+  uses the same profile wallet. Provider product management exposes row-level
+  listing actions through a menu with management navigation and destructive
+  delete confirmation, while bulk deletion removes only server-confirmed
+  deleted rows from the current table.
 - Autonomous agent templates, OpenAI planning and synthesis, deterministic
   fallback planning, run storage, funded budget ledgers, paid action execution,
   proof hashing, status labels, and UI clients live in `src/features/agents`.

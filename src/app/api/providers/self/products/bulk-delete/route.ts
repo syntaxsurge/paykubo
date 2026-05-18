@@ -21,12 +21,31 @@ export async function POST(request: Request) {
 
   const cookieStore = await cookies()
   const ownerWallet = cookieStore.get(WALLET_ADDRESS_COOKIE)?.value
-  const deleted = (
-    await Promise.all(ids.map(id => deleteProviderProduct(id, ownerWallet)))
-  ).filter(Boolean)
+
+  if (!ownerWallet) {
+    return NextResponse.json(
+      { error: 'Connect a provider wallet before deleting products.' },
+      { status: 401 }
+    )
+  }
+
+  const deletedIds: string[] = []
+
+  for (const id of ids) {
+    try {
+      const product = await deleteProviderProduct(id, ownerWallet)
+
+      if (product) {
+        deletedIds.push(product.slug)
+      }
+    } catch (error) {
+      console.error('Unable to delete provider product', { id, error })
+    }
+  }
 
   return NextResponse.json({
-    deleted: deleted.length,
+    deleted: deletedIds.length,
+    deletedIds,
     requested: ids.length
   })
 }
