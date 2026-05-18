@@ -282,6 +282,35 @@ function OrderStatusContent({
   const pollInFlightRef = useRef(false)
 
   useEffect(() => {
+    let cancelled = false
+
+    async function refreshOrder() {
+      const response = await fetch(`/api/orders/${orderId}`, {
+        headers: { Accept: 'application/json' }
+      }).catch(() => null)
+
+      if (!response?.ok || cancelled) {
+        return
+      }
+
+      const nextOrder = (await response
+        .json()
+        .catch(() => null)) as MarketplaceOrder | null
+
+      if (nextOrder?.id === orderId) {
+        setOrder(nextOrder)
+        storeMarketplaceOrderSnapshot(nextOrder)
+      }
+    }
+
+    void refreshOrder()
+
+    return () => {
+      cancelled = true
+    }
+  }, [orderId])
+
+  useEffect(() => {
     if (order) {
       return
     }
@@ -1544,6 +1573,16 @@ function ProviderResponsePanel({
           defaultOpen={false}
           maxHeightClassName='max-h-[28rem]'
           copyLabel='Copy trace'
+        />
+      ) : null}
+
+      {order.latestAsyncPollingResponse ? (
+        <JsonViewer
+          title='Latest async polling status'
+          value={order.latestAsyncPollingResponse}
+          defaultOpen={order.status === 'failed'}
+          maxHeightClassName='max-h-[28rem]'
+          copyLabel='Copy polling status'
         />
       ) : null}
 

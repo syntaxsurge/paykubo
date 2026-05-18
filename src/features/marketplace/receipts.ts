@@ -3,6 +3,7 @@ import {
   getPlatformFee
 } from '@/features/marketplace/schemas'
 import {
+  defaultAppChain,
   getExplorerTransactionUrl,
   paymentTokenSymbol
 } from '@/lib/config/chains'
@@ -22,7 +23,7 @@ export type MarketplaceReceipt = {
   providerPlan?: string
   platformFeeBps?: number
   providerShareBps?: number
-  network: 'eip155:2910'
+  network: string
   txHash: string
   explorerUrl: string | null
   escrowAddress?: string
@@ -46,5 +47,5 @@ export function buildReceiptAmounts(priceUsd: number, feeBps = 500) {
 }
 
 export function buildExplorerUrl(txHash: string | null | undefined) {
-  return getExplorerTransactionUrl(txHash, 2910)
+  return getExplorerTransactionUrl(txHash, defaultAppChain.id)
 }

@@ -82,7 +82,7 @@ async function canPriceProductFromContext(
     return false
   }
 
-  const orderId = context.adapter.getHeader?.('x-paykubo-order-id')
+  const orderId = context.adapter.getHeader?.('x-app-order-id')
   const order = orderId ? await getMarketplaceOrderById(orderId) : undefined
 
   if (!order || order.productSlug !== product.slug) {
@@ -117,8 +117,7 @@ const paidCallRoute: RouteConfig = {
     },
     maxTimeoutSeconds: x402MaxTimeoutSeconds
   },
-  description:
-    'USDC-settled Paykubo API call on Morph through the x402 protocol.',
+  description: `${paymentTokenSymbol}-settled ${siteConfig.name} API call through the x402 protocol.`,
   mimeType: 'application/json',
   unpaidResponseBody: async context => {
     const product = await requireProductFromContext(context)

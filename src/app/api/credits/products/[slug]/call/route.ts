@@ -202,7 +202,7 @@ export async function POST(
     providerPlan: feeSplit.planKey,
     platformFeeBps: feeSplit.platformFeeBps,
     providerShareBps: feeSplit.providerShareBps,
-    network: x402Network as 'eip155:2910',
+    network: x402Network,
     txHash: latestTopUp.settlementTxHash,
     explorerUrl: buildExplorerUrl(latestTopUp.settlementTxHash),
     createdAt,

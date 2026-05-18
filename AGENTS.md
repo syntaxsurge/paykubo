@@ -433,12 +433,14 @@ Before creating a new helper or service file:
 - `POST /api/orders` — validates a buyer API request payload and returns a
   payment-required order record with a stable provider idempotency key for the
   selected marketplace product.
-- `GET /api/orders/[orderId]` — returns an order lifecycle record.
+- `GET /api/orders/[orderId]` — returns an order lifecycle record and reconciles
+  active async provider status server-side before responding.
 - `GET /api/orders/[orderId]/provider-status` — polls a provider adapter for
   long-running job status, compares final credit-metered usage with the prepaid
   quote, locks results that require a metered delta, returns the latest provider
-  payload plus the sanitized upstream request trace, and persists only compact
-  status/result metadata for response bodies.
+  payload plus the sanitized upstream request trace, persists the latest compact
+  async polling snapshot, and recovers reserved escrow handoffs that settled
+  on-chain before the order snapshot was updated.
   `POST /api/orders/[orderId]/provider-status` retries the provider call for
   paid failed orders that still have a retryable/refundable settled request,
   without creating a second buyer payment.
@@ -490,9 +492,11 @@ Before creating a new helper or service file:
   — protect product calls with x402, return HTTP 402 payment requirements for
   unpaid requests, quote credit-metered requests before payment, verify and
   settle signed payment-token transfers through the configured facilitator,
-  start credit-metered async provider work only after settlement, send the
-  order's provider idempotency key to upstream POST endpoints, return paid
-  provider responses or pollable job records, and attach receipt metadata.
+  start credit-metered async provider work only after settlement, use the
+  generic `x-app-order-id` request header to bind browser-created orders to
+  settlement, send the order's provider idempotency key to upstream POST
+  endpoints, return paid provider responses or pollable job records, and attach
+  receipt metadata.
 - `POST /api/x402/orders/[orderId]/claim` — protects metered result release with
   x402 when final provider usage exceeds the prepaid quote, settles the delta in
   the configured settlement token, unlocks the stored provider result, and
@@ -625,8 +629,8 @@ Before creating a new helper or service file:
   filter by the profile wallet stored on each product, and payout settlement
   uses the same profile wallet. Provider product management exposes row-level
   listing actions through a menu with management navigation and destructive
-  delete confirmation, while bulk deletion removes only server-confirmed
-  deleted rows from the current table.
+  delete confirmation, while bulk deletion removes only server-confirmed deleted
+  rows from the current table.
 - Autonomous agent templates, OpenAI planning and synthesis, deterministic
   fallback planning, run storage, funded budget ledgers, paid action execution,
   proof hashing, status labels, and UI clients live in `src/features/agents`.
@@ -691,63 +695,64 @@ Before creating a new helper or service file:
   payment RPC failures use exponential backoff, promote any returned EIP-7623
   floor value to the next retry's minimum gas limit, record each attempt on the
   action, wait for successful transaction receipts, and avoid retrying after a
-  transaction hash is accepted so vault spends are not duplicated. Agent-paid x402 calls
-  retry retryable pre-response settlement and gateway failures three times with
-  fresh signed payloads; once a paid endpoint returns a provider/order response,
-  the gateway does not submit a second x402 payment for the same vault advance.
-  Escrow reserve, release, and refund writes use a higher floor-safe gas budget
-  than simple vault writes because `ApiPaymentEscrow.reservePayment` performs
-  role checks, storage writes, and token balance reads. They retry retryable RPC
-  failures and full-gas receipt reverts before surfacing escrow handoff
-  diagnostics. Async provider failures with transient HTTP status codes or
-  transient gateway language stay reserved for up to three provider retries
-  before the order becomes terminal and refund recovery begins. Refund recovery
-  reads the vault's live spent amount before calling `recordSpendRefund` so
-  retries and partially recovered failures do not request a larger refund than
-  the current vault state can accept, and it checks the backend agent signer's
-  settlement-token balance before submitting a return transfer so diagnostics
-  distinguish signer USDC shortages from the owner wallet's native gas balance.
-  Direct run reads refresh from Convex by run ID before using the in-memory run
-  cache so polling clients see the latest persisted progress across server
-  runtimes. Agent action progress records the settled x402 order/receipt and the
-  provider's initial response as soon as the paid request is accepted, then
-  keeps async media actions in `paid` state while polling for the terminal
-  provider output. The latest async provider-status poll is stored on the action
-  with attempt number, timestamp, polling URL, request method, headers, path
-  parameters, HTTP status, order state, result-release state, external job ID,
-  result URL when present, and compact response metadata; each new backend poll
-  replaces the prior visible snapshot instead of growing an unbounded history.
-  The run page refreshes running, attesting, and active paid async runs every
-  eight seconds, reconciles stale paid actions through the provider-status
-  endpoint using the configured public app origin, auto-resumes remaining
-  planned tools after an async action reaches a terminal state, renders the
-  latest async poll as a compact live-status disclosure without poll-number
-  timeline rows, summarizes each tool's quote, phase, vault spend, order, and
-  status in collapsed-by-default tool cards, and keeps compact request/response
-  JSON inside expandable diagnostics. Receipt, settlement, and vault transaction
-  links render as icon actions in each tool card header. Payment transaction
-  attempts render in expandable chronological per-action diagnostics with step
-  numbers, per-step retry numbers, gas limit, retry delay, message, and
-  transaction link when available. Funding, skipped tools, planner receipts, and
-  deliverable diagnostics live as collapsed sections at the bottom of the final
-  deliverable card. Long provider, gateway, and contract failure text stays
-  inside expandable copyable diagnostics with user-facing summaries for budget,
-  gas-floor, agent signer settlement-token balance, contract, refund, and tool
-  failures; run-control error banners appear only for failed runs or failed tool
-  actions, so recovered retry errors do not remain visible while tools continue
-  processing. AgentRunVault over-budget errors show funded, spent, available,
-  and attempted tool-spend context before the raw error. Public provider result
-  links render as compact host/path previews instead of full-width raw URLs.
-  Agent and marketplace snapshots persisted to Convex keep result URLs, job IDs,
-  statuses, pricing, and escrow metadata, but compact provider response bodies
-  before saving. When `AGENT_LLM_API_KEY` is configured, the agent uses the
-  OpenAI Responses API with `AGENT_LLM_MODEL` or `gpt-5.2` to select tools,
-  generate request payloads, skip unrelated tools, reserve one affordable media
-  tool when the objective or template requires video output, set a budget
-  strategy, and synthesize the final launch pack from completed paid responses
-  and receipts. When no paid action completes in production, the run remains
-  failed and presents diagnostics instead of treating generated copy as verified
-  output. When the key is absent, the deterministic fallback ranks the allowed
+  transaction hash is accepted so vault spends are not duplicated. Agent-paid
+  x402 calls retry retryable pre-response settlement and gateway failures three
+  times with fresh signed payloads; once a paid endpoint returns a
+  provider/order response, the gateway does not submit a second x402 payment for
+  the same vault advance. Escrow reserve, release, and refund writes use a
+  higher floor-safe gas budget than simple vault writes because
+  `ApiPaymentEscrow.reservePayment` performs role checks, storage writes, and
+  token balance reads. They retry retryable RPC failures and full-gas receipt
+  reverts before surfacing escrow handoff diagnostics. Async provider failures
+  with transient HTTP status codes or transient gateway language stay reserved
+  for up to three provider retries before the order becomes terminal and refund
+  recovery begins. Refund recovery reads the vault's live spent amount before
+  calling `recordSpendRefund` so retries and partially recovered failures do not
+  request a larger refund than the current vault state can accept, and it checks
+  the backend agent signer's settlement-token balance before submitting a return
+  transfer so diagnostics distinguish signer USDC shortages from the owner
+  wallet's native gas balance. Direct run reads refresh from Convex by run ID
+  before using the in-memory run cache so polling clients see the latest
+  persisted progress across server runtimes. Agent action progress records the
+  settled x402 order/receipt and the provider's initial response as soon as the
+  paid request is accepted, then keeps async media actions in `paid` state while
+  polling for the terminal provider output. The latest async provider-status
+  poll is stored on the action with attempt number, timestamp, polling URL,
+  request method, headers, path parameters, HTTP status, order state,
+  result-release state, external job ID, result URL when present, and compact
+  response metadata; each new backend poll replaces the prior visible snapshot
+  instead of growing an unbounded history. The run page refreshes running,
+  attesting, and active paid async runs every eight seconds, reconciles stale
+  paid actions through the provider-status endpoint using the configured public
+  app origin, auto-resumes remaining planned tools after an async action reaches
+  a terminal state, renders the latest async poll as a compact live-status
+  disclosure without poll-number timeline rows, summarizes each tool's quote,
+  phase, vault spend, order, and status in collapsed-by-default tool cards, and
+  keeps compact request/response JSON inside expandable diagnostics. Receipt,
+  settlement, and vault transaction links render as icon actions in each tool
+  card header. Payment transaction attempts render in expandable chronological
+  per-action diagnostics with step numbers, per-step retry numbers, gas limit,
+  retry delay, message, and transaction link when available. Funding, skipped
+  tools, planner receipts, and deliverable diagnostics live as collapsed
+  sections at the bottom of the final deliverable card. Long provider, gateway,
+  and contract failure text stays inside expandable copyable diagnostics with
+  user-facing summaries for budget, gas-floor, agent signer settlement-token
+  balance, contract, refund, and tool failures; run-control error banners appear
+  only for failed runs or failed tool actions, so recovered retry errors do not
+  remain visible while tools continue processing. AgentRunVault over-budget
+  errors show funded, spent, available, and attempted tool-spend context before
+  the raw error. Public provider result links render as compact host/path
+  previews instead of full-width raw URLs. Agent and marketplace snapshots
+  persisted to Convex keep result URLs, job IDs, statuses, pricing, and escrow
+  metadata, but compact provider response bodies before saving. When
+  `AGENT_LLM_API_KEY` is configured, the agent uses the OpenAI Responses API
+  with `AGENT_LLM_MODEL` or `gpt-5.2` to select tools, generate request
+  payloads, skip unrelated tools, reserve one affordable media tool when the
+  objective or template requires video output, set a budget strategy, and
+  synthesize the final launch pack from completed paid responses and receipts.
+  When no paid action completes in production, the run remains failed and
+  presents diagnostics instead of treating generated copy as verified output.
+  When the key is absent, the deterministic fallback ranks the allowed
   marketplace tools from the objective and source context while preserving
   required media-tool selection for video workflows. Both planner modes record
   the prompt, model or fallback label, rationale, skipped tools, selected tools,
@@ -858,35 +863,38 @@ Before creating a new helper or service file:
   pagination, status, amount, and order-opening actions. `/orders/[orderId]`
   shows buyer request lifecycle state using shared order status labels and
   descriptions from `src/features/marketplace/status.ts`; order detail pages
-  sign x402 USDC payments with the connected browser wallet, verify USDC
-  balance before asking for payment signatures, submit payment-token Permit2
-  allowance only when the configured transfer method requires it, retry
-  transient quote, token-readiness, signature, settlement, claim, and provider
-  status errors with bounded exponential backoff
-  while avoiding retries after receipt or payment artifacts are returned,
-  display step-by-step wallet progress as a compact icon timeline with explorer
-  links for submitted transactions, surface settlement failure guidance from the
-  x402 facilitator, show payment failures as dedicated alert cards with copyable
-  error text, keep long explanations inside collapsible details, separate direct
-  API responses from async provider jobs, automatically poll provider status
-  through the shared `useAutoPolling` hook when an order has an external job ID
-  or a retryable provider outage, keep escrow reserved for retryable provider
-  failures such as temporary 5xx, Cloudflare, timeout, rate-limit, or
-  provider-marked retryable responses until the 24-hour retry window expires,
-  complete async orders when a provider returns a completed status or cloneable
-  handoff URL, keep manual polling available, keep 402 inspection as a
-  diagnostic action, persist receipt metadata in browser session storage, show
-  quote/reservation/final usage amounts for credit-metered calls, claim metered
-  deltas through x402 before revealing locked results, show escrow
-  reserve/release/refund transaction links when a credit-metered async payment
-  uses escrow, and link to the settlement receipt and explorer transaction.
-  Draft products stay hidden from public marketplace usage but can be tested
-  through provider management by creating provider-test order records; locally
-  persisted draft listings created before owner metadata exists can still be
-  tested through matching order records. Browser session order snapshots use
-  compact session-safe storage so large provider payloads cannot block the
-  visible order state, and provider payload normalization removes malformed
-  indexed-character maps while preserving handoff URLs and billing metadata.
+  sign x402 USDC payments with the connected browser wallet, verify USDC balance
+  before asking for payment signatures, submit payment-token Permit2 allowance
+  only when the configured transfer method requires it, retry transient quote,
+  token-readiness, signature, settlement, claim, and provider status errors with
+  bounded exponential backoff while avoiding retries after receipt or payment
+  artifacts are returned, display step-by-step wallet progress as a compact icon
+  timeline with explorer links for submitted transactions, surface settlement
+  failure guidance from the x402 facilitator, show payment failures as dedicated
+  alert cards with copyable error text, keep long explanations inside
+  collapsible details, separate direct API responses from async provider jobs,
+  automatically poll provider status through the shared `useAutoPolling` hook
+  when an order has an external job ID or a retryable provider outage, reconcile
+  active async orders server-side through
+  `src/features/marketplace/async-provider-status.ts` on order reads and
+  provider-status requests, keep the latest polling attempt visible as copyable
+  diagnostics, keep escrow reserved for retryable provider failures such as
+  temporary 5xx, Cloudflare, timeout, rate-limit, or provider-marked retryable
+  responses until the 24-hour retry window expires, complete async orders when a
+  provider returns a completed status or cloneable handoff URL, keep manual
+  polling available, keep 402 inspection as a diagnostic action, persist receipt
+  metadata in browser session storage, show quote/reservation/final usage
+  amounts for credit-metered calls, claim metered deltas through x402 before
+  revealing locked results, show escrow reserve/release/refund transaction links
+  when a credit-metered async payment uses escrow, and link to the settlement
+  receipt and explorer transaction. Draft products stay hidden from public
+  marketplace usage but can be tested through provider management by creating
+  provider-test order records; locally persisted draft listings created before
+  owner metadata exists can still be tested through matching order records.
+  Browser session order snapshots use compact session-safe storage so large
+  provider payloads cannot block the visible order state, and provider payload
+  normalization removes malformed indexed-character maps while preserving
+  handoff URLs and billing metadata.
 - Marketplace products declare whether they are synchronous or asynchronous,
   whether settlement happens after a successful response, after job acceptance,
   or when a completed result is claimed, and whether results are returned

@@ -3,6 +3,33 @@ import type { ProviderRequestTrace } from '@/features/provider-adapters/types'
 
 export type OrderStatus = (typeof orderStatuses)[number]
 
+export type MarketplaceAsyncPollingResponse = {
+  id: string
+  attempt: number
+  polledAt: string
+  pollingUrl?: string
+  request: {
+    method: 'GET' | 'POST'
+    url?: string
+    headers?: Record<string, string>
+    params?: Record<string, string>
+  }
+  httpStatus: number
+  orderStatus?: OrderStatus
+  resultReleaseStatus?:
+    | 'not_applicable'
+    | 'reserved'
+    | 'released'
+    | 'provider_retrying'
+    | 'delta_payment_required'
+    | 'credit_due'
+    | 'refundable'
+    | 'refunded'
+  externalJobId?: string
+  resultUrl?: string
+  response: Record<string, unknown>
+}
+
 export type MarketplaceOrder = {
   id: string
   productSlug: string
@@ -66,6 +93,7 @@ export type MarketplaceOrder = {
     retryUntil: string
     attempts: number
   }
+  latestAsyncPollingResponse?: MarketplaceAsyncPollingResponse
   createdAt: string
   updatedAt: string
   resultUrl?: string

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
-import { getMarketplaceOrderById } from '@/features/marketplace/orders'
+import { getMarketplaceOrderWithAsyncProviderStatus } from '@/features/marketplace/async-provider-status'
+import { getPublicAppOrigin } from '@/lib/config/site'
 
 type OrderRouteProps = {
   params: Promise<{
@@ -8,9 +9,16 @@ type OrderRouteProps = {
   }>
 }
 
-export async function GET(_request: Request, { params }: OrderRouteProps) {
+export async function GET(request: Request, { params }: OrderRouteProps) {
   const { orderId } = await params
-  const order = await getMarketplaceOrderById(orderId)
+  const pollingUrl = new URL(
+    `/api/orders/${encodeURIComponent(orderId)}/provider-status`,
+    getPublicAppOrigin(request.url)
+  ).toString()
+  const order = await getMarketplaceOrderWithAsyncProviderStatus(
+    orderId,
+    pollingUrl
+  )
 
   if (!order) {
     return NextResponse.json({ error: 'Order was not found.' }, { status: 404 })

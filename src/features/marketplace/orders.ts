@@ -110,6 +110,15 @@ function createPersistableMarketplaceOrder(
     lockedResponsePayload: compactJsonPayload(order.lockedResponsePayload, 0),
     providerRequest: compactProviderRequestTrace(
       order.providerRequest
-    ) as MarketplaceOrder['providerRequest']
+    ) as MarketplaceOrder['providerRequest'],
+    latestAsyncPollingResponse: order.latestAsyncPollingResponse
+      ? {
+          ...order.latestAsyncPollingResponse,
+          response: compactJsonPayload(
+            order.latestAsyncPollingResponse.response,
+            0
+          ) as Record<string, unknown>
+        }
+      : undefined
   }
 }

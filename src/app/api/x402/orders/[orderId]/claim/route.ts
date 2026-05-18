@@ -137,7 +137,7 @@ export async function POST(request: NextRequest, { params }: ClaimRouteProps) {
     providerPlan: feeSplit.planKey,
     platformFeeBps: feeSplit.platformFeeBps,
     providerShareBps: feeSplit.providerShareBps,
-    network: x402Network as 'eip155:2910',
+    network: x402Network,
     txHash: settlement.transaction,
     explorerUrl: buildExplorerUrl(settlement.transaction),
     createdAt,

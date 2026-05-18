@@ -13,7 +13,9 @@ import type {
   AgentRun,
   CreateAgentRunInput
 } from '@/features/agents/types'
+import { syncMarketplaceOrderProviderStatus } from '@/features/marketplace/async-provider-status'
 import { buildExplorerUrl } from '@/features/marketplace/receipts'
+import { x402Network } from '@/lib/config/chains'
 import {
   getAgentRunBytes32,
   getAgentRunVaultBudget,
@@ -113,17 +115,19 @@ export async function syncAgentRunAsyncProviderStatus(
     headers: { Accept: 'application/json' },
     params: { orderId: syncableAction.orderId }
   }
-  const response = await fetch(pollingUrl, {
-    headers: pollingRequest.headers
-  }).catch(() => null)
+  const result = await syncMarketplaceOrderProviderStatus(
+    syncableAction.orderId,
+    {
+      pollingUrl,
+      allowReservedEscrowRecovery: true
+    }
+  ).catch(() => null)
 
-  if (!response) {
+  if (!result) {
     return canonicalRun
   }
 
-  const body = (await response
-    .json()
-    .catch(() => null)) as ProviderStatusResponse | null
+  const body = (result?.body ?? null) as ProviderStatusResponse | null
 
   if (!body?.order) {
     return canonicalRun
@@ -133,7 +137,7 @@ export async function syncAgentRunAsyncProviderStatus(
     action: syncableAction,
     pollingUrl,
     request: pollingRequest,
-    httpStatus: response.status,
+    httpStatus: result.status,
     body
   })
   const actionStatus = mapProviderStatusToAgentActionStatus(
@@ -567,7 +571,7 @@ export async function attestStoredAgentRun(runId: string) {
     ownerWallet: run.ownerWallet,
     proofHash,
     proofUri: `/proofs/${proofId}`,
-    network: 'eip155:2910',
+    network: x402Network,
     receiptIds: getAgentRunReceiptIds(run.actions),
     totalSpendUsdc: calculateTotalSpend(run),
     createdAt: now

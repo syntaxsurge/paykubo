@@ -125,7 +125,7 @@ export type AgentProof = {
   ownerWallet: string
   proofHash: `0x${string}`
   proofUri: string
-  network: 'eip155:2910'
+  network: string
   txHash: string | null
   explorerUrl: string | null
   receiptIds: string[]

@@ -34,6 +34,17 @@ export type EscrowWriteResult = {
 
 export type EscrowPaymentState = 'none' | 'reserved' | 'released' | 'refunded'
 
+export type EscrowPaymentDetails = {
+  token: Address
+  payer: Address
+  provider: Address
+  amount: bigint
+  settlementTxHash: Hex
+  state: EscrowPaymentState
+  reservedAt: bigint
+  finalizedAt: bigint
+}
+
 export const apiPaymentEscrowAbi = [
   {
     type: 'function',
@@ -162,10 +173,16 @@ export async function refundEscrowPayment(paymentId: Hex) {
 export async function getEscrowPaymentState(
   paymentId: Hex
 ): Promise<EscrowPaymentState> {
+  return (await getEscrowPaymentDetails(paymentId))?.state ?? 'none'
+}
+
+export async function getEscrowPaymentDetails(
+  paymentId: Hex
+): Promise<EscrowPaymentDetails | null> {
   const address = getEscrowAddress()
 
   if (!address) {
-    return 'none'
+    return null
   }
 
   const payment = await publicClient.readContract({
@@ -174,26 +191,60 @@ export async function getEscrowPaymentState(
     functionName: 'paymentOf',
     args: [paymentId]
   })
-  const state =
-    typeof payment === 'object' && payment && 'state' in payment
-      ? Number(payment.state)
-      : Array.isArray(payment)
-        ? Number(payment[5])
-        : 0
+  const tuple = Array.isArray(payment)
+    ? {
+        token: payment[0],
+        payer: payment[1],
+        provider: payment[2],
+        amount: payment[3],
+        settlementTxHash: payment[4],
+        state: payment[5],
+        reservedAt: payment[6],
+        finalizedAt: payment[7]
+      }
+    : payment
+  const state = Number(tuple.state)
 
   if (state === 1) {
-    return 'reserved'
+    return {
+      token: tuple.token,
+      payer: tuple.payer,
+      provider: tuple.provider,
+      amount: tuple.amount,
+      settlementTxHash: tuple.settlementTxHash,
+      state: 'reserved',
+      reservedAt: tuple.reservedAt,
+      finalizedAt: tuple.finalizedAt
+    }
   }
 
   if (state === 2) {
-    return 'released'
+    return {
+      token: tuple.token,
+      payer: tuple.payer,
+      provider: tuple.provider,
+      amount: tuple.amount,
+      settlementTxHash: tuple.settlementTxHash,
+      state: 'released',
+      reservedAt: tuple.reservedAt,
+      finalizedAt: tuple.finalizedAt
+    }
   }
 
   if (state === 3) {
-    return 'refunded'
+    return {
+      token: tuple.token,
+      payer: tuple.payer,
+      provider: tuple.provider,
+      amount: tuple.amount,
+      settlementTxHash: tuple.settlementTxHash,
+      state: 'refunded',
+      reservedAt: tuple.reservedAt,
+      finalizedAt: tuple.finalizedAt
+    }
   }
 
-  return 'none'
+  return null
 }
 
 export async function waitForEscrowSettlementTransaction(txHash: Hex) {

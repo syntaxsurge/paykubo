@@ -22,15 +22,15 @@ proof-ready records.
 
 Word count: 93
 
-## 2-Minute Cut
+## Demo Flow
 
-### 1.) 0:00-0:20 - Intro
+### 1.) Problem And Morph Use Case
 
 - **Show:** Paykubo homepage with Morph, USDC, x402, marketplace, and agent
   messaging.
 - **Voiceover:** Paykubo is our project for the x402 Agentic Payments track. It turns existing APIs, like video generation, into USDC-paid tools on Morph that people and agents can buy per request through x402.
 
-### 2.) 0:20-0:45 - Add ClipLore
+### 2.) Add ClipLore
 
 - **Show:** cliplore.ai OpenAPI URL, API key page, then Paykubo provider
   product form.
@@ -38,13 +38,13 @@ Word count: 93
   In Paykubo, I import the spec, choose the video job endpoint, add the key
   server-side, price it in USDC, and publish it as agent-ready.
 
-### 3.) 0:45-1:10 - Run From Marketplace
+### 3.) Run From Marketplace
 
 - **Show:** `/marketplace`, ClipLore product, `/orders/new`, payment console,
   completed order, and result link.
 - **Voiceover:** A buyer opens the marketplace, runs the ClipLore, and pays through x402. Paykubo settles USDC on Morph, then returns the ClipLore output link.
 
-### 4.) 1:10-1:35 - Run The Agent
+### 4.) Run The Agent
 
 - **Show:** `/agents`, Video Launch Campaign Agent, funding transaction, paid
   actions, receipts, and deliverables.
@@ -52,14 +52,20 @@ Word count: 93
   USDC, let it choose paid tools, and run the actions. The agent buys the
   ClipLore API through the same marketplace rails.
 
-### 5.) 1:35-2:00 - Play The Output
+### 5.) Play The Output
 
 - **Show:** Agent deliverable link, ClipLore project page, and generated video
   playback.
 - **Voiceover:** Finally, I open the ClipLore link returned by the agent and
-  play the generated video. That completes the loop: provider API, buyer
-  payment, autonomous agent spend, Morph settlement, receipts, and a real
-  output.
+  play the generated video.
+
+### 6.) What's Next
+
+- **Show:** End on the Paykubo agent, proof, or receipt page.
+- **Voiceover:** Next, we will onboard more real API providers, add more agent
+  templates for paid digital work, improve provider analytics, and make Paykubo
+  production-ready for developers and businesses that want request-based USDC
+  payments on Morph.
 
 ## Recording Steps
 
@@ -133,7 +139,16 @@ Word count: 93
   who paid, who earned, how much settled, and which Morph transaction completed
   the payment.
 
-### 6.) Run The Video Launch Campaign Agent
+### 6.) What's Next
+
+- End on the agent run, proof, or receipt page.
+- Show the completed paid action history and ClipLore output link.
+- **Voiceover:** Next, we will onboard more real API providers, add more agent
+  templates for paid digital work, improve provider analytics, and make Paykubo
+  production-ready for developers and businesses that want request-based USDC
+  payments on Morph.
+
+### 7.) Run The Video Launch Campaign Agent
 
 - Open `/agents`.
 - Select `Video Launch Campaign Agent`.
@@ -154,7 +169,7 @@ Word count: 93
   the funded USDC budget, buys paid tools through x402, and records receipts for
   each paid action.
 
-### 7.) Play The Agent Video
+### 8.) Play The Agent Video
 
 - Open the completed agent deliverable.
 - Click the ClipLore project or output link.

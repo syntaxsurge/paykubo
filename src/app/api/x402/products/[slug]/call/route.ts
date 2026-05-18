@@ -38,6 +38,7 @@ import {
 import {
   getApiPaymentPayTo,
   getEscrowPaymentId,
+  getEscrowPaymentDetails,
   getEscrowPaymentState,
   refundEscrowPayment,
   releaseEscrowPayment,
@@ -102,7 +103,7 @@ async function handlePaidProductCall(
   rawPayload: unknown
 ) {
   const product = await getProductBySlug(slug)
-  const requestedOrderId = request.headers.get('x-paykubo-order-id')
+  const requestedOrderId = getRequestedOrderId(request.headers)
   const agentRunId = request.headers.get('x-app-agent-run-id') ?? undefined
   const existingOrder = requestedOrderId
     ? await getMarketplaceOrderById(requestedOrderId)
@@ -317,7 +318,7 @@ async function handlePaidProductCall(
     providerPlan: feeSplit.planKey,
     platformFeeBps: feeSplit.platformFeeBps,
     providerShareBps: feeSplit.providerShareBps,
-    network: x402Network as 'eip155:2910',
+    network: x402Network,
     txHash: settlement.transaction,
     explorerUrl: buildExplorerUrl(settlement.transaction),
     createdAt,
@@ -409,6 +410,10 @@ function canCallProduct(
   return order.buyerWallet.toLowerCase() === product.ownerWallet.toLowerCase()
 }
 
+function getRequestedOrderId(headers: Headers) {
+  return headers.get('x-app-order-id')
+}
+
 async function handlePrepaidAsyncProviderCall({
   server,
   processResult,
@@ -482,7 +487,7 @@ async function handlePrepaidAsyncProviderCall({
     providerPlan: feeSplit.planKey,
     platformFeeBps: feeSplit.platformFeeBps,
     providerShareBps: feeSplit.providerShareBps,
-    network: x402Network as 'eip155:2910',
+    network: x402Network,
     txHash: settlement.transaction,
     explorerUrl: buildExplorerUrl(settlement.transaction),
     escrowAddress: escrowContext?.escrowAddress,
@@ -510,8 +515,11 @@ async function handlePrepaidAsyncProviderCall({
       : ('not_applicable' as const),
     escrowAddress: escrowContext?.escrowAddress,
     escrowPaymentId: escrowContext?.paymentId,
-    escrowReserveTxHash: escrowContext?.reserveTxHash,
-    escrowReserveExplorerUrl: escrowContext?.reserveExplorerUrl,
+    escrowReserveTxHash:
+      escrowContext?.reserveTxHash ?? existingOrder?.escrowReserveTxHash,
+    escrowReserveExplorerUrl:
+      escrowContext?.reserveExplorerUrl ??
+      existingOrder?.escrowReserveExplorerUrl,
     requestId,
     providerIdempotencyKey,
     requestPayloadJson:
@@ -1094,6 +1102,26 @@ async function reservePrepaidEscrow({
 
   if (!payer || !provider || !isAddress(payer) || !isAddress(provider)) {
     throw new Error('Escrow payment addresses are invalid.')
+  }
+
+  const existingPayment = await getEscrowPaymentDetails(paymentId).catch(
+    () => null
+  )
+
+  if (existingPayment?.state === 'reserved') {
+    return {
+      paymentId,
+      escrowAddress,
+      reserveTxHash: undefined,
+      reserveExplorerUrl: undefined
+    }
+  }
+
+  if (
+    existingPayment?.state === 'released' ||
+    existingPayment?.state === 'refunded'
+  ) {
+    throw new Error(`Escrow payment is already ${existingPayment.state}.`)
   }
 
   const amount =
