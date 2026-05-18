@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 
-import { encodeFunctionData, isAddress, numberToHex, parseEther } from 'viem'
+import { encodeFunctionData, isAddress, numberToHex, parseUnits } from 'viem'
 
 import { useWalletRuntimeReady } from '@/components/providers/wallet-provider'
 import { Button } from '@/components/ui/button'
@@ -21,15 +21,15 @@ type EthereumProvider = {
 
 type AdminSubscriptionActionsProps = {
   contractAddress: `0x${string}` | null
-  basePriceEth: string
-  plusPriceEth: string
+  basePriceNative: string
+  plusPriceNative: string
   supportsTreasuryWithdraw: boolean
 }
 
 export function AdminSubscriptionActions({
   contractAddress,
-  basePriceEth,
-  plusPriceEth,
+  basePriceNative,
+  plusPriceNative,
   supportsTreasuryWithdraw
 }: AdminSubscriptionActionsProps) {
   const walletRuntimeReady = useWalletRuntimeReady()
@@ -51,8 +51,8 @@ export function AdminSubscriptionActions({
         <AdminSubscriptionActionForms
           address={address}
           contractAddress={contractAddress}
-          basePriceEth={basePriceEth}
-          plusPriceEth={plusPriceEth}
+          basePriceNative={basePriceNative}
+          plusPriceNative={plusPriceNative}
           supportsTreasuryWithdraw={supportsTreasuryWithdraw}
         />
       )}
@@ -63,24 +63,24 @@ export function AdminSubscriptionActions({
 function AdminSubscriptionActionForms({
   address,
   contractAddress,
-  basePriceEth,
-  plusPriceEth,
+  basePriceNative,
+  plusPriceNative,
   supportsTreasuryWithdraw
 }: AdminSubscriptionActionsProps & { address: string | null }) {
-  const [base, setBase] = React.useState(basePriceEth)
-  const [plus, setPlus] = React.useState(plusPriceEth)
+  const [base, setBase] = React.useState(basePriceNative)
+  const [plus, setPlus] = React.useState(plusPriceNative)
   const [recipient, setRecipient] = React.useState(address ?? '')
   const [withdrawAmount, setWithdrawAmount] = React.useState('')
   const [status, setStatus] = React.useState('')
   const [isPending, setIsPending] = React.useState(false)
 
   React.useEffect(() => {
-    setBase(basePriceEth)
-  }, [basePriceEth])
+    setBase(basePriceNative)
+  }, [basePriceNative])
 
   React.useEffect(() => {
-    setPlus(plusPriceEth)
-  }, [plusPriceEth])
+    setPlus(plusPriceNative)
+  }, [plusPriceNative])
 
   React.useEffect(() => {
     if (address && !recipient) {
@@ -133,10 +133,14 @@ function AdminSubscriptionActionForms({
     setStatus('Waiting for admin wallet confirmation...')
 
     try {
-      const nextBase = parseEther(base)
-      const nextPlus = parseEther(plus)
-      const currentBase = basePriceEth ? parseEther(basePriceEth) : null
-      const currentPlus = plusPriceEth ? parseEther(plusPriceEth) : null
+      const nextBase = parseNativeTokenAmount(base)
+      const nextPlus = parseNativeTokenAmount(plus)
+      const currentBase = basePriceNative
+        ? parseNativeTokenAmount(basePriceNative)
+        : null
+      const currentPlus = plusPriceNative
+        ? parseNativeTokenAmount(plusPriceNative)
+        : null
 
       const updates: Array<{ planKey: 1 | 2; priceWei: bigint }> = []
 
@@ -189,7 +193,9 @@ function AdminSubscriptionActionForms({
         throw new Error('Enter a valid withdrawal recipient.')
       }
 
-      const amount = withdrawAmount.trim() ? parseEther(withdrawAmount) : 0n
+      const amount = withdrawAmount.trim()
+        ? parseNativeTokenAmount(withdrawAmount)
+        : 0n
 
       await sendContractTransaction(
         encodeFunctionData({
@@ -308,4 +314,8 @@ function AdminSubscriptionActionForms({
       ) : null}
     </div>
   )
+}
+
+function parseNativeTokenAmount(value: string) {
+  return parseUnits(value, 18)
 }

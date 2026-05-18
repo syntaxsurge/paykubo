@@ -7,7 +7,7 @@ export const siteConfig = {
   name: envClient.NEXT_PUBLIC_APP_NAME ?? 'App',
   description:
     envClient.NEXT_PUBLIC_APP_DESCRIPTION ??
-    'USDC-native API commerce for humans, applications, and AI agents.',
+    'USDC-native API commerce for humans, applications, and AI agents on Morph.',
   url: envClient.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
   links: {
     github: 'https://github.com/morph-org',

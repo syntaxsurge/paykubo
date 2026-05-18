@@ -3,6 +3,7 @@ import type { ProviderAdapterResult } from '@/features/provider-adapters/types'
 
 export const PROVIDER_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000
 export const PROVIDER_RETRY_DEFAULT_AFTER_SECONDS = 60
+export const PROVIDER_RETRY_MAX_RETRIES = 3
 
 type RetryableProviderFailure = {
   retryable: true
@@ -47,6 +48,7 @@ export function classifyProviderFailure({
     .join(' ')
     .toLowerCase()
   const messageLooksTransient =
+    /\b(408|425|429|500|502|503|504)\b/.test(message) ||
     message.includes('bad gateway') ||
     message.includes('timeout') ||
     message.includes('temporar') ||
@@ -79,6 +81,7 @@ export function classifyProviderFailure({
     getNumeric(payload.retry_after) ??
     order?.providerRetry?.retryAfterSeconds ??
     PROVIDER_RETRY_DEFAULT_AFTER_SECONDS
+  const attempts = (order?.providerRetry?.attempts ?? 0) + 1
 
   return {
     retryable: true,
@@ -89,8 +92,10 @@ export function classifyProviderFailure({
       'Provider returned a retryable temporary error.',
     retryAfterSeconds: Math.max(5, Math.floor(retryAfterSeconds)),
     retryUntil,
-    expired: now.getTime() >= Date.parse(retryUntil),
-    attempts: (order?.providerRetry?.attempts ?? 0) + 1
+    expired:
+      now.getTime() >= Date.parse(retryUntil) ||
+      attempts > PROVIDER_RETRY_MAX_RETRIES,
+    attempts
   }
 }
 

@@ -73,6 +73,18 @@ export type AgentAsyncPollingResponse = {
   response: Record<string, unknown>
 }
 
+export type AgentActionVaultAttempt = {
+  attempt: number
+  functionName: string
+  status: 'failed' | 'succeeded'
+  message: string
+  gasLimit?: string
+  txHash?: string | null
+  explorerUrl?: string | null
+  retryDelayMs?: number
+  createdAt: string
+}
+
 export type AgentAction = {
   id: string
   runId: string
@@ -95,9 +107,11 @@ export type AgentAction = {
   vaultAdvancedAmountUsdc?: string
   vaultSpendTxHash?: string | null
   vaultSpendExplorerUrl?: string | null
+  vaultSpendAttempts?: AgentActionVaultAttempt[]
   vaultRefundedAmountUsdc?: string
   vaultRefundTxHash?: string | null
   vaultRefundExplorerUrl?: string | null
+  vaultRefundAttempts?: AgentActionVaultAttempt[]
   vaultReturnTxHash?: string | null
   vaultReturnExplorerUrl?: string | null
   errorMessage?: string

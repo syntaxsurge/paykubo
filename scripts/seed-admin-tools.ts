@@ -27,7 +27,7 @@ const adminWallet = resolveAdminWallet()
 const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL
 
 if (!convexUrl) {
-  throw new Error('NEXT_PUBLIC_CONVEX_URL is required to seed admin tools.')
+  throw new Error('Set NEXT_PUBLIC_CONVEX_URL before seeding admin tools.')
 }
 
 const client = new ConvexHttpClient(convexUrl)

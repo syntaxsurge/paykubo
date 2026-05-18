@@ -20,7 +20,8 @@ import { privateKeyToAccount } from 'viem/accounts'
 import {
   defaultAppChain,
   paymentTokenAddress,
-  paymentTokenDecimals
+  paymentTokenDecimals,
+  paymentTokenTransferMethod
 } from '../src/lib/config/chains'
 
 config({ path: '.env.local' })
@@ -72,7 +73,7 @@ const usdcBalanceAbi = parseAbi([
   'function balanceOf(address owner) view returns (uint256)'
 ])
 
-async function ensurePermit2Allowance(amountUsd: number) {
+async function ensureSignerPaymentReadiness(amountUsd: number) {
   const account = privateKeyToAccount(getPrivateKey() as Hex)
   const requiredAmount = parseUnits(
     amountUsd.toFixed(Math.min(paymentTokenDecimals, 6)),
@@ -84,20 +85,12 @@ async function ensurePermit2Allowance(amountUsd: number) {
   }
 
   const tokenAddress = paymentTokenAddress as Address
-  const [balance, allowance] = await Promise.all([
-    publicClient.readContract({
-      address: tokenAddress,
-      abi: usdcBalanceAbi,
-      functionName: 'balanceOf',
-      args: [account.address]
-    }),
-    publicClient.readContract(
-      getPermit2AllowanceReadParams({
-        tokenAddress,
-        ownerAddress: account.address
-      })
-    )
-  ])
+  const balance = await publicClient.readContract({
+    address: tokenAddress,
+    abi: usdcBalanceAbi,
+    functionName: 'balanceOf',
+    args: [account.address]
+  })
 
   if (balance < requiredAmount) {
     throw new Error(
@@ -106,6 +99,17 @@ async function ensurePermit2Allowance(amountUsd: number) {
       )}, available ${formatUsdcAmount(balance)}.`
     )
   }
+
+  if (paymentTokenTransferMethod !== 'permit2') {
+    return
+  }
+
+  const allowance = await publicClient.readContract(
+    getPermit2AllowanceReadParams({
+      tokenAddress,
+      ownerAddress: account.address
+    })
+  )
 
   if (allowance >= requiredAmount) {
     return
@@ -205,7 +209,7 @@ async function main() {
   const estimatedPrice = product?.priceUsd ?? 0
 
   if (estimatedPrice > 0) {
-    await ensurePermit2Allowance(estimatedPrice)
+    await ensureSignerPaymentReadiness(estimatedPrice)
   }
 
   const client = new x402Client()

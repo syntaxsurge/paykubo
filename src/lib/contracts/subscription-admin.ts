@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { Address, createPublicClient, formatEther, http, isAddress } from 'viem'
+import { Address, createPublicClient, formatUnits, http, isAddress } from 'viem'
 
 import {
   getExplorerAddressUrl,
@@ -166,8 +166,8 @@ export async function getAdminSubscriptionSnapshot(
   }
 }
 
-export function formatEtherInput(value: bigint | null) {
-  return value === null ? '' : formatEther(value)
+export function formatNativePriceInput(value: bigint | null) {
+  return value === null ? '' : formatUnits(value, 18)
 }
 
 async function readPlanPrice(contractAddress: Address, planKey: 1 | 2) {

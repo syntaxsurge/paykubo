@@ -14,7 +14,7 @@ import { buttonClasses } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
   AdminSubscriptionQuery,
-  formatEtherInput,
+  formatNativePriceInput,
   getAdminSubscriptionSnapshot
 } from '@/lib/contracts/subscription-admin'
 
@@ -123,8 +123,8 @@ export default async function AdminSubscriptionsPage({
 
       <AdminSubscriptionActions
         contractAddress={snapshot.contractAddress}
-        basePriceEth={formatEtherInput(snapshot.basePriceWei)}
-        plusPriceEth={formatEtherInput(snapshot.plusPriceWei)}
+        basePriceNative={formatNativePriceInput(snapshot.basePriceWei)}
+        plusPriceNative={formatNativePriceInput(snapshot.plusPriceWei)}
         supportsTreasuryWithdraw={snapshot.supportsTreasuryWithdraw}
       />
 

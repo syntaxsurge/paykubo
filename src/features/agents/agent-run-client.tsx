@@ -9,6 +9,7 @@ import {
   Bot,
   Braces,
   CheckCircle2,
+  ChevronDown,
   CircleDollarSign,
   Clock,
   ExternalLink,
@@ -390,7 +391,9 @@ function AgentRunContent({
       setStatus(
         body.status === 'completed'
           ? 'Agent run completed paid actions and prepared deliverables.'
-          : body.summary
+          : body.status === 'failed'
+            ? body.summary
+            : ''
       )
     } catch (caughtError) {
       setStatus(
@@ -502,6 +505,7 @@ function AgentRunContent({
     run.fundingStatus === 'refund_available' &&
     run.availableAmountUsdc !== '0.00 USDC'
   const finalOutputs = collectFinalOutputs(run)
+  const runControlStatus = getVisibleRunControlStatus(run, status)
 
   return (
     <div className='space-y-5'>
@@ -516,7 +520,7 @@ function AgentRunContent({
         <RunControlPanel
           run={run}
           address={address}
-          status={status}
+          status={runControlStatus}
           isFunding={isFunding}
           isRunning={isRunning}
           isRefunding={isRefunding}
@@ -532,8 +536,6 @@ function AgentRunContent({
       </section>
 
       <ExecutionSection run={run} />
-
-      <AdvancedRunDetails run={run} />
 
       <FinalOutputSection outputs={finalOutputs} run={run} />
     </div>
@@ -758,6 +760,17 @@ function RunSummaryCard({
   run: AgentRun
   completedPaidActions: number
 }) {
+  const completed = run.actions.filter(
+    action => action.status === 'completed'
+  ).length
+  const failed = run.actions.filter(action => action.status === 'failed').length
+  const running = run.actions.filter(action =>
+    ['quoted', 'paid'].includes(action.status)
+  ).length
+  const queued = run.actions.filter(
+    action => action.status === 'planned'
+  ).length
+
   return (
     <Card className='overflow-hidden p-0'>
       <div className='border-border/70 bg-background/35 border-b p-5 sm:p-6'>
@@ -803,6 +816,18 @@ function RunSummaryCard({
             icon={Sparkles}
             label='Planner'
             value={formatPlanner(run)}
+          />
+          <SummaryStat icon={Clock} label='Running' value={String(running)} />
+          <SummaryStat icon={Bot} label='Queued' value={String(queued)} />
+          <SummaryStat
+            icon={CheckCircle2}
+            label='Completed'
+            value={String(completed)}
+          />
+          <SummaryStat
+            icon={AlertTriangle}
+            label='Failed'
+            value={String(failed)}
           />
         </div>
 
@@ -956,12 +981,7 @@ function RunControlPanel({
 
         {status ? (
           <div className='space-y-2'>
-            <p
-              className='border-border bg-muted/35 rounded-lg border p-3 text-sm leading-6 break-words'
-              role='status'
-            >
-              {status}
-            </p>
+            <RunStatusMessage run={run} status={status} />
             {isRefundStatusMessage(status) ? (
               <RefundTransactionLinks run={run} />
             ) : null}
@@ -1095,8 +1115,86 @@ function collectRefundLinks(run: AgentRun) {
   return links
 }
 
+function getVisibleRunControlStatus(run: AgentRun, status: string) {
+  if (!status) {
+    return ''
+  }
+
+  const notice = buildRunErrorNotice(status, run)
+
+  if (!notice) {
+    return status
+  }
+
+  if (shouldSuppressRecoveredRunError(run)) {
+    return ''
+  }
+
+  return status
+}
+
+function shouldSuppressRecoveredRunError(run: AgentRun) {
+  const hasFailedAction = run.actions.some(action => action.status === 'failed')
+
+  if (run.status === 'failed' || hasFailedAction) {
+    return false
+  }
+
+  return (
+    ['running', 'completed', 'attested'].includes(run.status) ||
+    run.actions.some(action => ['quoted', 'paid'].includes(action.status))
+  )
+}
+
 function isRefundStatusMessage(status: string) {
   return /\brefund|refunded|refunding\b/i.test(status)
+}
+
+function RunStatusMessage({ run, status }: { run: AgentRun; status: string }) {
+  const notice = buildRunErrorNotice(status, run)
+
+  if (!notice) {
+    return (
+      <p
+        className='border-border bg-muted/35 rounded-lg border p-3 text-sm leading-6 [overflow-wrap:anywhere]'
+        role='status'
+      >
+        {status}
+      </p>
+    )
+  }
+
+  return (
+    <div
+      className='max-w-full min-w-0 overflow-hidden rounded-lg border border-red-500/30 bg-red-500/10'
+      role='status'
+    >
+      <div className='p-3'>
+        <div className='min-w-0'>
+          <p className='font-semibold text-red-700 dark:text-red-200'>
+            {notice.title}
+          </p>
+          <p className='mt-1 text-sm leading-6 break-words text-red-700/85 dark:text-red-200/85'>
+            {notice.message}
+          </p>
+          {notice.detail ? (
+            <p className='mt-2 text-xs leading-5 break-words text-red-700/75 dark:text-red-200/75'>
+              {notice.detail}
+            </p>
+          ) : null}
+        </div>
+      </div>
+      <JsonViewer
+        title='Full error message'
+        value={notice.raw}
+        defaultOpen={false}
+        copyLabel='Copy error'
+        tone='error'
+        className='rounded-none border-x-0 border-b-0 shadow-none'
+        maxHeightClassName='max-h-72'
+      />
+    </div>
+  )
 }
 
 function ExecutionSection({ run }: { run: AgentRun }) {
@@ -1120,8 +1218,13 @@ function ExecutionSection({ run }: { run: AgentRun }) {
         </div>
       ) : (
         <div className='grid gap-3'>
-          {run.actions.map(action => (
-            <ActionCard key={action.id} action={action} />
+          {run.actions.map((action, index) => (
+            <ActionCard
+              key={action.id}
+              action={action}
+              run={run}
+              stepNumber={index + 1}
+            />
           ))}
         </div>
       )}
@@ -1318,7 +1421,15 @@ function LedgerTimeline({ events }: { events: AgentLedgerEvent[] }) {
   )
 }
 
-function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
+function ActionCard({
+  action,
+  run,
+  stepNumber
+}: {
+  action: AgentRun['actions'][number]
+  run: AgentRun
+  stepNumber: number
+}) {
   const displayStatus = getActionDisplayStatus(action)
   const Icon =
     displayStatus.tone === 'completed'
@@ -1329,14 +1440,17 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
   const outputItems = collectActionOutputs(action)
 
   return (
-    <div className='border-border bg-background/55 rounded-lg border p-4 shadow-sm'>
-      <div className='flex flex-wrap items-start justify-between gap-3'>
+    <details className='group border-border bg-background/55 overflow-hidden rounded-lg border shadow-sm'>
+      <summary className='flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden'>
         <div className='min-w-0'>
           <div className='flex items-center gap-2'>
+            <span className='bg-primary/10 text-primary flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold'>
+              {stepNumber}
+            </span>
             <Icon className='text-primary h-4 w-4' aria-hidden />
             <p className='font-semibold'>{action.productName}</p>
           </div>
-          <p className='text-foreground/60 mt-1 text-sm'>
+          <p className='text-foreground/60 mt-1 text-sm break-words'>
             {action.providerName} - {action.amountUsdc}
           </p>
         </div>
@@ -1345,66 +1459,250 @@ function ActionCard({ action }: { action: AgentRun['actions'][number] }) {
           <span className='bg-muted rounded-md px-2 py-1 text-xs font-semibold'>
             {displayStatus.label}
           </span>
-        </div>
-      </div>
-      {action.errorMessage ? (
-        <p className='mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm leading-6 text-red-600 dark:text-red-300'>
-          {action.errorMessage}
-        </p>
-      ) : null}
-      {action.planningRationale ? (
-        <details className='border-border bg-muted/30 mt-3 rounded-lg border p-3 text-sm'>
-          <summary className='cursor-pointer font-semibold'>
-            Planner rationale
-          </summary>
-          <p className='text-foreground/65 mt-2 leading-6'>
-            {action.planningRationale}
-          </p>
-        </details>
-      ) : null}
-      {outputItems.length > 0 ? (
-        <div className='mt-4'>
-          <SectionLabel icon={Link2} label='Tool output' />
-          <OutputGallery outputs={outputItems} className='mt-2' compact />
-        </div>
-      ) : null}
-      {action.asyncPollingResponses?.length ? (
-        <AsyncPollingPanel action={action} />
-      ) : null}
-      <details className='border-border/70 bg-muted/20 mt-4 rounded-lg border'>
-        <summary className='flex cursor-pointer list-none items-center justify-between gap-3 p-3 text-sm font-semibold [&::-webkit-details-marker]:hidden'>
-          <span className='flex items-center gap-2'>
-            <Braces className='text-primary h-4 w-4' aria-hidden />
-            Request and response JSON
+          <span className='text-foreground/50 inline-flex items-center gap-1 text-xs font-semibold group-open:hidden'>
+            Expand
+            <ChevronDown className='h-3.5 w-3.5' aria-hidden />
           </span>
-          <span className='text-foreground/50 text-xs'>Expand</span>
-        </summary>
-        <div className='border-border/70 grid gap-3 border-t p-3 lg:grid-cols-2'>
-          <JsonViewer
-            title='Tool request'
-            value={action.requestPayload}
-            defaultOpen={false}
-            copyLabel='Copy request'
+          <span className='text-foreground/50 hidden items-center gap-1 text-xs font-semibold group-open:inline-flex'>
+            Collapse
+            <ChevronDown className='h-3.5 w-3.5 rotate-180' aria-hidden />
+          </span>
+        </div>
+      </summary>
+      <div className='border-border/70 border-t p-4'>
+        {action.errorMessage ? (
+          <ActionErrorPanel action={action} run={run} />
+        ) : null}
+        <PaymentAttemptPanel action={action} />
+        <div className='mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4'>
+          <ActionMetric label='Quote' value={action.amountUsdc} />
+          <ActionMetric label='Phase' value={getActionPhaseLabel(action)} />
+          <ActionMetric
+            label='Vault spend'
+            value={action.vaultAdvancedAmountUsdc ?? 'Not advanced'}
           />
-          <JsonViewer
-            title='Tool response'
-            value={
-              action.responsePayload ?? {
-                status: action.status,
-                message:
-                  action.errorMessage ??
-                  (action.status === 'paid'
-                    ? 'The paid request is running. the gateway is waiting for the provider response.'
-                    : 'No response payload recorded yet.')
-              }
-            }
-            defaultOpen={false}
-            copyLabel='Copy response'
+          <ActionMetric
+            label='Order'
+            value={action.orderId ? shorten(action.orderId) : 'Not created'}
           />
         </div>
-      </details>
+        <p className='text-foreground/65 mt-3 text-sm leading-6 break-words'>
+          {action.objective}
+        </p>
+        {action.planningRationale ? (
+          <details className='border-border bg-muted/30 mt-3 rounded-lg border p-3 text-sm'>
+            <summary className='cursor-pointer font-semibold'>
+              Planner rationale
+            </summary>
+            <p className='text-foreground/65 mt-2 leading-6'>
+              {action.planningRationale}
+            </p>
+          </details>
+        ) : null}
+        {outputItems.length > 0 ? (
+          <div className='mt-4'>
+            <SectionLabel icon={Link2} label='Tool output' />
+            <OutputGallery outputs={outputItems} className='mt-2' compact />
+          </div>
+        ) : null}
+        {action.asyncPollingResponses?.length ? (
+          <AsyncPollingPanel action={action} />
+        ) : null}
+        <details className='border-border/70 bg-muted/20 mt-4 rounded-lg border'>
+          <summary className='flex cursor-pointer list-none items-center justify-between gap-3 p-3 text-sm font-semibold [&::-webkit-details-marker]:hidden'>
+            <span className='flex items-center gap-2'>
+              <Braces className='text-primary h-4 w-4' aria-hidden />
+              Request and response JSON
+            </span>
+            <span className='text-foreground/50 text-xs'>Expand</span>
+          </summary>
+          <div className='border-border/70 grid gap-3 border-t p-3 lg:grid-cols-2'>
+            <JsonViewer
+              title='Tool request'
+              value={action.requestPayload}
+              defaultOpen={false}
+              copyLabel='Copy request'
+            />
+            <JsonViewer
+              title='Tool response'
+              value={
+                action.responsePayload ?? {
+                  status: action.status,
+                  message:
+                    action.errorMessage ??
+                    (action.status === 'paid'
+                      ? 'The paid request is running. the gateway is waiting for the provider response.'
+                      : 'No response payload recorded yet.')
+                }
+              }
+              defaultOpen={false}
+              copyLabel='Copy response'
+            />
+          </div>
+        </details>
+      </div>
+    </details>
+  )
+}
+
+function ActionErrorPanel({
+  action,
+  run
+}: {
+  action: AgentRun['actions'][number]
+  run: AgentRun
+}) {
+  const notice = buildActionErrorNotice(action, run)
+
+  return (
+    <div className='mt-3 max-w-full min-w-0 overflow-hidden rounded-lg border border-red-500/30 bg-red-500/10'>
+      <div className='flex items-start justify-between gap-3 p-3'>
+        <span className='flex min-w-0 items-start gap-3'>
+          <AlertTriangle
+            className='mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-300'
+            aria-hidden
+          />
+          <span className='min-w-0'>
+            <span className='block font-semibold text-red-700 dark:text-red-200'>
+              {notice.title}
+            </span>
+            <span className='mt-1 block text-sm leading-6 break-words text-red-700/85 dark:text-red-200/85'>
+              {notice.message}
+            </span>
+            {notice.detail ? (
+              <span className='mt-2 block text-xs leading-5 break-words text-red-700/75 dark:text-red-200/75'>
+                {notice.detail}
+              </span>
+            ) : null}
+          </span>
+        </span>
+      </div>
+      <JsonViewer
+        title='Full error message'
+        value={notice.raw}
+        defaultOpen={false}
+        copyLabel='Copy error'
+        tone='error'
+        className='rounded-none border-x-0 border-b-0 shadow-none'
+        maxHeightClassName='max-h-72'
+      />
     </div>
   )
+}
+
+function PaymentAttemptPanel({
+  action
+}: {
+  action: AgentRun['actions'][number]
+}) {
+  const attempts = collectPaymentAttempts(action)
+
+  if (!attempts.length) {
+    return null
+  }
+
+  const retryCount = attempts.filter(attempt => attempt.retryDelayMs).length
+
+  return (
+    <details className='group border-border/80 bg-card/45 mt-3 overflow-hidden rounded-lg border'>
+      <summary className='flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 p-3 [&::-webkit-details-marker]:hidden'>
+        <span className='flex min-w-0 items-center gap-2'>
+          <RefreshCw className='text-primary h-4 w-4 shrink-0' aria-hidden />
+          <span className='font-semibold'>Payment transaction attempts</span>
+          <span className='bg-muted rounded-md px-2 py-1 text-xs font-semibold'>
+            {attempts.length} total
+          </span>
+          {retryCount ? (
+            <span className='rounded-md bg-red-500/10 px-2 py-1 text-xs font-semibold text-red-600 dark:text-red-300'>
+              {retryCount} {retryCount === 1 ? 'retry' : 'retries'}
+            </span>
+          ) : null}
+        </span>
+        <span className='text-foreground/50 text-xs group-open:hidden'>
+          Expand
+        </span>
+        <span className='text-foreground/50 hidden text-xs group-open:inline'>
+          Collapse
+        </span>
+      </summary>
+      <div className='border-border/70 grid gap-2 border-t p-3'>
+        {attempts.map((attempt, index) => (
+          <div
+            key={`${attempt.functionName}-${attempt.attempt}-${attempt.createdAt}`}
+            className='border-border/70 bg-background/45 rounded-lg border p-3'
+          >
+            <div className='flex flex-wrap items-start justify-between gap-3'>
+              <div className='min-w-0'>
+                <p className='text-sm font-semibold'>
+                  Step {index + 1} - {humanizePath(attempt.functionName)}
+                  {attempt.attempt > 1 ? ` (try ${attempt.attempt})` : ''}
+                </p>
+                <p className='text-foreground/55 mt-1 text-xs'>
+                  {new Date(attempt.createdAt).toLocaleString()}
+                  {attempt.gasLimit ? ` - gas ${attempt.gasLimit}` : ''}
+                  {attempt.retryDelayMs
+                    ? ` - retry after ${formatRetryDelay(attempt.retryDelayMs)}`
+                    : ''}
+                </p>
+              </div>
+              <span
+                className={[
+                  'rounded-md px-2 py-1 text-xs font-semibold',
+                  attempt.status === 'succeeded'
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+                    : 'bg-red-500/10 text-red-600 dark:text-red-300'
+                ].join(' ')}
+              >
+                {attempt.status}
+              </span>
+            </div>
+            <p className='text-foreground/65 mt-2 text-sm leading-6 [overflow-wrap:anywhere]'>
+              {attempt.message}
+            </p>
+            {attempt.explorerUrl && attempt.txHash ? (
+              <a
+                href={attempt.explorerUrl}
+                target='_blank'
+                rel='noreferrer'
+                className='text-primary mt-2 inline-flex items-center gap-1 text-sm font-semibold underline-offset-4 hover:underline'
+              >
+                {shorten(attempt.txHash)}
+                <ExternalLink className='h-3.5 w-3.5' aria-hidden />
+              </a>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </details>
+  )
+}
+
+function ActionMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className='border-border/70 bg-background/45 min-w-0 rounded-lg border p-2.5'>
+      <p className='text-foreground/55 text-[0.68rem] font-semibold tracking-[0.12em] uppercase'>
+        {label}
+      </p>
+      <p className='mt-1 text-sm font-semibold [overflow-wrap:anywhere]'>
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function collectPaymentAttempts(action: AgentRun['actions'][number]) {
+  return [
+    ...(action.vaultSpendAttempts ?? []),
+    ...(action.vaultRefundAttempts ?? [])
+  ].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+}
+
+function formatRetryDelay(delayMs: number) {
+  if (delayMs < 1000) {
+    return `${delayMs}ms`
+  }
+
+  return `${(delayMs / 1000).toFixed(delayMs % 1000 === 0 ? 0 : 1)}s`
 }
 
 function getActionDisplayStatus(action: AgentRun['actions'][number]) {
@@ -1440,6 +1738,184 @@ function getActionDisplayStatus(action: AgentRun['actions'][number]) {
         : action.status === 'failed'
           ? ('failed' as const)
           : ('running' as const)
+  }
+}
+
+function getActionPhaseLabel(action: AgentRun['actions'][number]) {
+  const poll = getLatestAsyncPoll(action)
+
+  if (poll?.orderStatus === 'processing') {
+    return 'Provider processing'
+  }
+
+  if (poll?.orderStatus === 'forwarding') {
+    return 'Provider call'
+  }
+
+  if (action.status === 'quoted') {
+    return 'Vault advance'
+  }
+
+  if (action.status === 'paid') {
+    return poll?.orderStatus ? humanizePath(poll.orderStatus) : 'Paid request'
+  }
+
+  return agentActionStatusLabels[action.status]
+}
+
+type AgentErrorNotice = {
+  title: string
+  message: string
+  detail?: string
+  raw: string
+}
+
+function buildActionErrorNotice(
+  action: AgentRun['actions'][number],
+  run: AgentRun
+): AgentErrorNotice {
+  const raw = action.errorMessage ?? 'The tool call failed.'
+  const lower = raw.toLowerCase()
+
+  if (
+    lower.includes('agentrunvault: over budget') ||
+    (lower.includes('recordspend') && lower.includes('over budget'))
+  ) {
+    return {
+      title: 'Agent budget is not enough for this tool call',
+      message: `The vault rejected the ${action.amountUsdc} spend for ${action.productName} because the funded run budget does not cover this action.`,
+      detail: `Funded: ${run.fundedAmountUsdc}. Spent: ${run.spentAmountUsdc}. Available: ${run.availableAmountUsdc}. Create or fund a run with enough USDC for this tool, then retry the action.`,
+      raw
+    }
+  }
+
+  if (
+    lower.includes('reservepayment escrow transaction') ||
+    lower.includes('async_prepaid_handoff_failed') ||
+    lower.includes('could not finish the async provider handoff')
+  ) {
+    return {
+      title: 'Escrow reservation failed',
+      message:
+        'The x402 payment reached the async escrow path, but the gateway could not record the escrow reservation on-chain.',
+      detail:
+        'This only affects prepaid async tools. The gateway uses a higher floor-safe gas limit and retries escrow writes before reporting this failure.',
+      raw
+    }
+  }
+
+  if (
+    lower.includes('permit2_insufficient_balance') ||
+    lower.includes('agent signer does not have enough usdc') ||
+    lower.includes('agent signer cannot return unused usdc') ||
+    lower.includes('agent signer could not return unused usdc') ||
+    lower.includes('signerusdcreturn')
+  ) {
+    return {
+      title: 'Agent signer needs USDC, not wallet gas',
+      message:
+        'The vault advanced this tool budget to the backend agent signer, but the signer did not have enough USDC available for settlement or refund recovery.',
+      detail: `This is separate from your connected wallet's ${defaultAppChain.nativeCurrency.symbol} balance. Check AGENT_SPENDER_PRIVATE_KEY, the signer USDC balance, Permit2 allowance, and whether another failed or concurrent run consumed the signer funds before retrying.`,
+      raw
+    }
+  }
+
+  if (
+    lower.includes('gas limit below eip-7623 floor') ||
+    lower.includes('failed to verify the fees') ||
+    lower.includes('invalid_exact_evm_transaction_failed')
+  ) {
+    return {
+      title: 'Settlement gas estimate was too low',
+      message:
+        'The Morph RPC rejected the payment settlement before execution because the submitted gas limit was below the network calldata floor.',
+      detail:
+        'No provider result is lost before the provider accepts the paid request. Retry after the gateway uses the local floor-safe x402 facilitator.',
+      raw
+    }
+  }
+
+  if (lower.includes('contract function') || lower.includes('reverted')) {
+    return {
+      title: 'Contract transaction failed',
+      message:
+        'The agent could not complete the on-chain vault or settlement step for this tool call.',
+      detail:
+        'Check the budget, token allowance, configured vault address, and operator wallet before retrying.',
+      raw
+    }
+  }
+
+  if (lower.includes('refund')) {
+    return {
+      title: 'Tool failed during refund recovery',
+      message:
+        'The paid tool did not complete and the gateway could not fully recover the advanced vault funds.',
+      detail:
+        'Open the full error details and transaction links before retrying or refunding the remaining budget.',
+      raw
+    }
+  }
+
+  return {
+    title: 'Tool call failed',
+    message:
+      'This tool did not reach a successful terminal state. The full provider or gateway error is available below.',
+    raw
+  }
+}
+
+function buildRunErrorNotice(
+  status: string,
+  run: AgentRun
+): AgentErrorNotice | null {
+  const lower = status.toLowerCase()
+  const looksLikeError =
+    lower.includes('error') ||
+    lower.includes('failed') ||
+    lower.includes('reverted') ||
+    lower.includes('exception') ||
+    lower.includes('over budget') ||
+    lower.includes('invalid_exact_evm_transaction_failed') ||
+    lower.includes('agentrunvault')
+
+  if (!looksLikeError) {
+    return null
+  }
+
+  if (
+    lower.includes('agentrunvault: over budget') ||
+    lower.includes('over budget')
+  ) {
+    return {
+      title: 'Agent budget is not enough',
+      message:
+        'The vault rejected a spend because the remaining funded budget is lower than the next paid tool quote.',
+      detail: `Funded: ${run.fundedAmountUsdc}. Spent: ${run.spentAmountUsdc}. Available: ${run.availableAmountUsdc}.`,
+      raw: status
+    }
+  }
+
+  if (
+    lower.includes('gas limit below eip-7623 floor') ||
+    lower.includes('failed to verify the fees') ||
+    lower.includes('invalid_exact_evm_transaction_failed')
+  ) {
+    return {
+      title: 'Settlement gas estimate was too low',
+      message:
+        'The Morph RPC rejected a payment transaction before execution because the submitted gas limit was below the calldata floor.',
+      detail:
+        'Retry after the gateway uses the local floor-safe x402 facilitator and floor-safe contract writes.',
+      raw: status
+    }
+  }
+
+  return {
+    title: 'Run action failed',
+    message:
+      'The agent could not continue the current run. Expand the details for the full gateway or contract error.',
+    raw: status
   }
 }
 
@@ -1528,6 +2004,7 @@ function ActionLinks({ action }: { action: AgentRun['actions'][number] }) {
             className={classes}
             title={label}
             aria-label={label}
+            onClick={event => event.stopPropagation()}
           >
             <Icon className='h-4 w-4' aria-hidden />
           </a>
@@ -1538,6 +2015,7 @@ function ActionLinks({ action }: { action: AgentRun['actions'][number] }) {
             className={classes}
             title={label}
             aria-label={label}
+            onClick={event => event.stopPropagation()}
           >
             <Icon className='h-4 w-4' aria-hidden />
           </Link>
@@ -1732,6 +2210,7 @@ function FinalOutputSection({
           inspect failed or pending calls.
         </p>
       )}
+      <AdvancedRunDetails run={run} />
     </Card>
   )
 }

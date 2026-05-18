@@ -15,6 +15,11 @@
     "convex:deploy": "npx convex deploy -y",
     "convex:redeploy": "pnpm run convex:deploy && pnpm run convex:dev",
     "convex:reset": "dotenv -e .env.local -- tsx scripts/reset-convex.ts",
+    "vercel:env:sync": "node scripts/sync-vercel-env.cjs",
+    "vercel:env:sync:production": "node scripts/sync-vercel-env.cjs production --deploy",
+    "vercel:env:sync:preview": "node scripts/sync-vercel-env.cjs preview",
+    "vercel:env:sync:development": "node scripts/sync-vercel-env.cjs development",
+    "seed:database": "dotenv -e .env.local -- tsx scripts/seed-database.ts",
     "seed:admin-tools": "dotenv -e .env.local -- tsx scripts/seed-admin-tools.ts",
     "contracts:deploy": "tsx scripts/deploy-contracts.ts",
     "contracts:deploy:agent": "pnpm --dir blockchain deploy:agent-attestor",
@@ -71,6 +76,7 @@
     "prettier": "^3.6.2",
     "prettier-plugin-tailwindcss": "^0.6.14",
     "tsx": "^4.20.3",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vercel": "^54.4.1"
   }
 }

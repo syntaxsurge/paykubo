@@ -13,6 +13,10 @@ import { privateKeyToAccount } from 'viem/accounts'
 
 import { buildExplorerUrl } from '@/features/marketplace/receipts'
 import { defaultAppChain, paymentTokenDecimals } from '@/lib/config/chains'
+import {
+  extractEip7623FloorGasFromError,
+  getBufferedContractWriteGasLimit
+} from '@/lib/contracts/gas'
 import { envServer } from '@/lib/env/env.server'
 
 type EscrowableProduct = {
@@ -86,6 +90,9 @@ const publicClient = createPublicClient({
   chain: defaultAppChain.viemChain,
   transport: http(defaultAppChain.viemChain.rpcUrls.default.http[0])
 })
+const escrowWriteMaxAttempts = 3
+const escrowWriteBaseRetryDelayMs = 750
+const escrowWriteMinimumGas = 750_000n
 
 export function shouldUseApiPaymentEscrow(product: EscrowableProduct) {
   return (
@@ -244,18 +251,119 @@ async function writeEscrow({
     args,
     account
   })
-  const txHash = await walletClient.writeContract(request)
-
-  const receipt = await publicClient.waitForTransactionReceipt({
-    hash: txHash
-  })
-
-  if (receipt.status !== 'success') {
-    throw new Error(`${functionName} transaction reverted.`)
+  const gasRequest = request as typeof request & {
+    data?: Hex
+    gas?: bigint
   }
 
-  return {
-    txHash,
-    explorerUrl: buildExplorerUrl(txHash)
+  let retryMinimumGas: bigint | undefined
+  let lastError: unknown
+  let attemptsUsed = 0
+
+  for (let attempt = 1; attempt <= escrowWriteMaxAttempts; attempt += 1) {
+    attemptsUsed = attempt
+    let gasLimit: bigint | undefined
+
+    try {
+      gasLimit = getBufferedContractWriteGasLimit({
+        data: gasRequest.data,
+        estimatedGas: gasRequest.gas,
+        minimumGas: maxBigInt(escrowWriteMinimumGas, retryMinimumGas ?? 0n)
+      })
+
+      const txHash = await walletClient.writeContract({
+        ...request,
+        gas: gasLimit
+      })
+
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash
+      })
+
+      if (receipt.status !== 'success') {
+        if (receipt.gasUsed >= gasLimit && attempt < escrowWriteMaxAttempts) {
+          retryMinimumGas = gasLimit * 2n
+          lastError = new Error(
+            `${functionName} escrow transaction used the full ${gasLimit.toString()} gas limit and likely ran out of gas: ${txHash}`
+          )
+          await delay(escrowWriteBaseRetryDelayMs * 2 ** (attempt - 1))
+          continue
+        }
+
+        throw new Error(`${functionName} transaction reverted: ${txHash}`)
+      }
+
+      return {
+        txHash,
+        explorerUrl: buildExplorerUrl(txHash)
+      }
+    } catch (error) {
+      lastError = error
+      retryMinimumGas =
+        extractEip7623FloorGasFromError(error) ?? retryMinimumGas
+
+      if (
+        attempt >= escrowWriteMaxAttempts ||
+        !isRetryableEscrowWriteError(error)
+      ) {
+        break
+      }
+
+      await delay(escrowWriteBaseRetryDelayMs * 2 ** (attempt - 1))
+    }
   }
+
+  throw new Error(
+    `${functionName} escrow transaction failed after ${attemptsUsed} ${
+      attemptsUsed === 1 ? 'attempt' : 'attempts'
+    }. ${describeEscrowWriteError(lastError)}`
+  )
+}
+
+function isRetryableEscrowWriteError(error: unknown) {
+  const message = describeEscrowWriteError(error).toLowerCase()
+
+  if (message.includes('reverted') || message.includes('already')) {
+    return false
+  }
+
+  return (
+    message.includes('gas limit below eip-7623 floor') ||
+    message.includes('failed to verify the fees') ||
+    message.includes('missing or invalid parameters') ||
+    message.includes('out of gas') ||
+    message.includes('timeout') ||
+    message.includes('timed out') ||
+    message.includes('network') ||
+    message.includes('connection') ||
+    message.includes('temporar') ||
+    message.includes('rate limit') ||
+    message.includes('429') ||
+    message.includes('500') ||
+    message.includes('internal server error') ||
+    message.includes('bad gateway') ||
+    message.includes('503') ||
+    message.includes('nonce too low') ||
+    message.includes('underpriced')
+  )
+}
+
+function describeEscrowWriteError(error: unknown) {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  return typeof error === 'string'
+    ? error
+    : 'Escrow transaction failed before a receipt was available.'
+}
+
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function maxBigInt(...values: bigint[]) {
+  return values.reduce((currentMax, value) =>
+    value > currentMax ? value : currentMax
+  )
 }

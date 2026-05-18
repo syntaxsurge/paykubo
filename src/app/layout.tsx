@@ -37,7 +37,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#f7fff3'
+  themeColor: '#f7f4ee'
 }
 
 export default function RootLayout({
@@ -59,10 +59,10 @@ export default function RootLayout({
           Skip to content
         </a>
         <NextTopLoader
-          color='#1be500'
+          color='#14b8a6'
           height={3}
           showSpinner={false}
-          shadow='0 0 16px rgba(27, 229, 0, 0.45)'
+          shadow='0 0 16px rgba(20, 184, 166, 0.45)'
         />
         <NavigationProgressEvents />
         <AppProviders>{children}</AppProviders>

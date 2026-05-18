@@ -3,7 +3,13 @@
 import type { MouseEvent } from 'react'
 import { useMemo, useState } from 'react'
 
-import { Braces, Check, Copy } from 'lucide-react'
+import {
+  AlertTriangle,
+  Braces,
+  Check,
+  Copy,
+  type LucideIcon
+} from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils/cn'
@@ -18,9 +24,42 @@ type JsonViewerProps = {
   copyLabel?: string
   copiedLabel?: string
   normalizeEscapedStrings?: boolean
+  tone?: 'default' | 'error'
 }
 
 const maxStringParseDepth = 8
+const viewerToneClasses = {
+  default: {
+    root: 'border-border/80 bg-card/75 shadow-sm',
+    summary: '',
+    icon: 'text-primary',
+    copyButton: '',
+    body: 'border-border/70',
+    pre: 'bg-muted/80 text-foreground',
+    iconComponent: Braces
+  },
+  error: {
+    root: 'border-red-500/30 bg-red-500/10',
+    summary: 'text-red-700 dark:text-red-200',
+    icon: 'text-red-600 dark:text-red-300',
+    copyButton:
+      'border-red-500/30 bg-red-500/10 text-red-700 hover:bg-red-500/15 dark:text-red-200',
+    body: 'border-red-500/25',
+    pre: 'bg-background/85 text-foreground',
+    iconComponent: AlertTriangle
+  }
+} satisfies Record<
+  NonNullable<JsonViewerProps['tone']>,
+  {
+    root: string
+    summary: string
+    icon: string
+    copyButton: string
+    body: string
+    pre: string
+    iconComponent: LucideIcon
+  }
+>
 
 export function JsonViewer({
   value,
@@ -30,9 +69,12 @@ export function JsonViewer({
   maxHeightClassName = 'max-h-96',
   copyLabel = 'Copy JSON',
   copiedLabel = 'Copied',
-  normalizeEscapedStrings = true
+  normalizeEscapedStrings = true,
+  tone = 'default'
 }: JsonViewerProps) {
   const [copied, setCopied] = useState(false)
+  const toneClasses = viewerToneClasses[tone]
+  const Icon = toneClasses.iconComponent
   const displayText = useMemo(
     () => formatJsonDisplayValue(value, { normalizeEscapedStrings }),
     [normalizeEscapedStrings, value]
@@ -51,13 +93,22 @@ export function JsonViewer({
     <details
       open={defaultOpen}
       className={cn(
-        'group border-border/80 bg-card/75 overflow-hidden rounded-xl border shadow-sm',
+        'group max-w-full min-w-0 overflow-hidden rounded-xl border',
+        toneClasses.root,
         className
       )}
     >
       <summary className='flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 [&::-webkit-details-marker]:hidden'>
-        <span className='flex min-w-0 items-center gap-2 text-sm font-semibold'>
-          <Braces className='text-primary h-4 w-4 shrink-0' aria-hidden />
+        <span
+          className={cn(
+            'flex min-w-0 items-center gap-2 text-sm font-semibold',
+            toneClasses.summary
+          )}
+        >
+          <Icon
+            className={cn('h-4 w-4 shrink-0', toneClasses.icon)}
+            aria-hidden
+          />
           <span className='truncate'>{title}</span>
         </span>
         <Button
@@ -65,7 +116,7 @@ export function JsonViewer({
           variant='outline'
           size='sm'
           onClick={copyText}
-          className='shrink-0'
+          className={cn('shrink-0', toneClasses.copyButton)}
         >
           {copied ? (
             <Check className='h-4 w-4' aria-hidden />
@@ -75,10 +126,11 @@ export function JsonViewer({
           {copied ? copiedLabel : copyLabel}
         </Button>
       </summary>
-      <div className='border-border/70 border-t p-4'>
+      <div className={cn('max-w-full min-w-0 border-t p-4', toneClasses.body)}>
         <pre
           className={cn(
-            'bg-muted/80 text-foreground max-w-full overflow-auto rounded-lg p-4 text-xs leading-6 break-words whitespace-pre-wrap',
+            'max-w-full min-w-0 overflow-x-hidden overflow-y-auto rounded-lg p-4 text-xs leading-6 [overflow-wrap:anywhere] break-all whitespace-pre-wrap',
+            toneClasses.pre,
             maxHeightClassName
           )}
         >

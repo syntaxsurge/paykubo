@@ -445,8 +445,8 @@ Before creating a new helper or service file:
 - `GET /api/receipts/[receiptId]` — returns a settlement receipt record.
 - `POST /api/credits/accounts` — creates or returns a managed credit account and
   managed-credit API key for a wallet.
-- `POST /api/credits/top-ups` — records a settlement-token top-up transaction hash and
-  increases the wallet's managed credit balance.
+- `POST /api/credits/top-ups` — records a settlement-token top-up transaction
+  hash and increases the wallet's managed credit balance.
 - `POST /api/credits/products/[slug]/call` — calls a product with a API key,
   reserves managed credits before provider work starts, releases the reservation
   on provider failure, settles lower final usage back to the credit balance,
@@ -480,8 +480,8 @@ Before creating a new helper or service file:
 - `POST /api/agents/runs/[runId]/execute` — runs the autonomous workflow,
   calling selected product x402 product endpoints with the configured funded
   production agent spender, using the current app origin for hosted x402 calls,
-  preparing the agent signer's settlement-token Permit2 allowance when required, and
-  returning detailed payment or provider failures for action diagnostics.
+  preparing the agent signer's settlement-token Permit2 allowance when required,
+  and returning detailed payment or provider failures for action diagnostics.
 - `POST /api/agents/runs/[runId]/attest` — hashes completed run metadata and
   writes the proof to the configured AgentRunAttestor when available.
 - `GET /api/proofs/[proofId]` — returns a public proof package for a completed
@@ -489,13 +489,14 @@ Before creating a new helper or service file:
 - `GET /api/x402/products/[slug]/call` and `POST /api/x402/products/[slug]/call`
   — protect product calls with x402, return HTTP 402 payment requirements for
   unpaid requests, quote credit-metered requests before payment, verify and
-  settle signed payment-token transfers through the configured facilitator, start
-  credit-metered async provider work only after settlement, send the order's
-  provider idempotency key to upstream POST endpoints, return paid provider
-  responses or pollable job records, and attach receipt metadata.
+  settle signed payment-token transfers through the configured facilitator,
+  start credit-metered async provider work only after settlement, send the
+  order's provider idempotency key to upstream POST endpoints, return paid
+  provider responses or pollable job records, and attach receipt metadata.
 - `POST /api/x402/orders/[orderId]/claim` — protects metered result release with
   x402 when final provider usage exceeds the prepaid quote, settles the delta in
-  the configured settlement token, unlocks the stored provider result, and records a delta receipt.
+  the configured settlement token, unlocks the stored provider result, and
+  records a delta receipt.
 - `POST /api/providers/openapi/preview` — imports a hosted or uploaded OpenAPI
   JSON/YAML document and returns paid-listing candidates with inferred endpoint
   URL, method, auth type, schemas, reference payload, async polling paths, and
@@ -519,6 +520,9 @@ Before creating a new helper or service file:
   products, product versions, orders, receipts, API requests, webhook events,
   usage events, payouts, autonomous agent runs, agent actions, agent proofs,
   saved examples, and reviews; client helper in `src/lib/db/convex/client.ts`.
+  Database seeding lives in `scripts/seed-database.ts` for wallet-scoped users
+  and associated provider profiles, plus `scripts/seed-admin-tools.ts` for
+  public provider-owned marketplace tools.
 - Hardhat blockchain workspace in `blockchain/` with
   `contracts/SubscriptionManager.sol` plus `contracts/AgentRunAttestor.sol` for
   on-chain proof hashes and `contracts/ApiPaymentEscrow.sol` for prepaid
@@ -532,9 +536,10 @@ Before creating a new helper or service file:
 - Shared UI primitives in `src/components/ui` and layout shells in
   `src/components/layout`.
 - Shared JSON rendering lives in `src/components/data-display/json-viewer.tsx`
-  with default copy support, collapsible diagnostics, and nested JSON string
-  normalization for provider responses, sanitized provider request traces,
-  request previews, agent deliverables, and public proof payloads.
+  with default copy support, collapsible diagnostics, error-tone rendering for
+  raw failure text, and nested JSON string normalization for provider responses,
+  sanitized provider request traces, request previews, agent deliverables, and
+  public proof payloads.
 - Shared server-fed table rendering lives in
   `src/components/data-display/server-data-table.tsx` with URL-driven search,
   sorting, pagination, optional current-page row selection, and optional bulk
@@ -549,9 +554,12 @@ Before creating a new helper or service file:
   searched, sorted, and paginated without resetting neighboring tables.
   Selection is enabled only for tables that need row-level or bulk operations,
   and the shared selection controller supports current-page master selection
-  plus controlled selection state for custom workflows. Server-side query
-  helpers live in `src/lib/table/server-table.ts` and are used by agent
-  templates/runs, marketplace products, orders, and provider product management.
+  plus controlled selection state for custom workflows. Bulk selection renders
+  as an active command bar; destructive actions such as delete/remove use red
+  buttons and red confirmation affordances across every server-fed table.
+  Server-side query helpers live in `src/lib/table/server-table.ts` and are used
+  by agent templates/runs, marketplace products, orders, and provider product
+  management.
 - Shared site header in `src/components/layout/site-header.tsx` across marketing
   and app shells, with app logo branding, public navigation, theme controls, a
   server-verified admin shortcut for allowlisted active wallets, and an avatar
@@ -568,8 +576,8 @@ Before creating a new helper or service file:
   persist through `/api/settings/profile` into the Convex `users` table and
   hydrate client displays through `src/hooks/use-user-settings.ts`; browser
   localStorage is not used for profile persistence. The profile page and header
-  account menu also read the connected wallet's native network-token balance
-  and configured stablecoin balance on the configured EVM chain through
+  account menu also read the connected wallet's native network-token balance and
+  configured stablecoin balance on the configured EVM chain through
   `src/hooks/use-wallet-balances.ts`, so displayed balances follow the active
   settlement token and network environment.
 - The app favicon is generated from the app logo and lives only at
@@ -627,84 +635,121 @@ Before creating a new helper or service file:
   research, documentation, readiness, and creative workflows, including
   video-first launch campaigns that combine public data scans with async
   media-generation tools when budget allows. Agent runs require the owner to
-  fund the `AgentRunVault` with the configured settlement token before the configured agent signer can
-  execute x402 paid actions. The run detail client funds through the browser
-  EIP-1193 wallet provider, requests the MetaMask account when needed, switches
-  or adds the configured EVM network, checks the connected wallet's
-  settlement-token balance and vault allowance, submits the token approval when
-  needed, verifies receipt success, then submits `fundRun` and verifies the
-  funding receipt before confirming the run server-side. Funding confirmation
-  and execution both verify the run against the current deployed vault's
-  `budgetOf` state, so stale local funding records from an old vault reset to an
-  unfunded state instead of attempting `recordSpend`. Before each paid action,
-  the gateway advances the quoted settlement-token amount from the vault to the agent signer
-  with `recordSpend`, verifies the signer's balance, submits the required
-  Permit2 approval when the allowance is insufficient, waits until the allowance
-  is readable, and then executes the hosted x402 call from the same origin that
-  triggered the run. If a pre-settlement failure occurs after the vault advance,
-  or if an escrowed provider failure refunds the x402 payment back to the
-  signer, the gateway returns the settlement token to the vault and records
-  `recordSpendRefund`; unrecovered settlement or refund failures stay counted as
-  spent and remain visible in diagnostics. Running executions persist planner
-  and per-action progress as tools move from quoted to paid to terminal states,
-  and the run detail client auto-polls `GET /api/agents/runs/[runId]` while the
-  run is executing or attesting so users can watch async progress without a
-  manual refresh. Paid action failures preserve the response body, settlement
-  guidance, and provider details in action diagnostics. Async provider actions
-  use the same `/api/orders/[orderId]/provider-status` polling path as
-  marketplace orders; queued and processing media jobs remain incomplete until
-  the provider returns a terminal result, refund state, or completed project
-  URL. Agent-paid x402 calls include the agent run ID in gateway order and
-  receipt records so provider dashboards and usage pages count autonomous tool
-  calls in the same revenue ledger as browser and developer API calls. x402
-  payment requirements use the settlement token's EIP-712 domain metadata in
+  fund the `AgentRunVault` with the configured settlement token before the
+  configured agent signer can execute x402 paid actions. The run detail client
+  funds through the browser EIP-1193 wallet provider, requests the MetaMask
+  account when needed, switches or adds the configured EVM network, checks the
+  connected wallet's settlement-token balance and vault allowance, submits the
+  token approval when needed, verifies receipt success, then submits `fundRun`
+  and verifies the funding receipt before confirming the run server-side.
+  Funding confirmation and execution both verify the run against the current
+  deployed vault's `budgetOf` state, so stale local funding records from an old
+  vault reset to an unfunded state instead of attempting `recordSpend`. Before
+  each paid action, the gateway advances the quoted settlement-token amount from
+  the vault to the agent signer with `recordSpend`, verifies the signer's
+  balance with bounded polling after the `recordSpend` receipt is confirmed,
+  submits the required Permit2 approval when the allowance is insufficient,
+  waits until the allowance is readable, and then executes the hosted x402 call
+  from the same origin that triggered the run. If a pre-settlement failure
+  occurs after the vault advance, or if an escrowed provider failure refunds the
+  x402 payment back to the signer, the gateway returns the settlement token to
+  the vault and records `recordSpendRefund`; if x402 settlement already moved
+  funds from the signer to async escrow but escrow accounting cannot be
+  recorded, the gateway does not attempt a signer return and instead keeps the
+  action spent with escrow handoff diagnostics. Unrecovered settlement or refund
+  failures stay counted as spent and remain visible in diagnostics. Running
+  executions persist planner and per-action progress as tools move from quoted
+  to paid to terminal states, and the run detail client auto-polls
+  `GET /api/agents/runs/[runId]` while the run is executing or attesting so
+  users can watch async progress without a manual refresh. Paid action failures
+  preserve the response body, settlement guidance, and provider details in
+  action diagnostics. Async provider actions use the same
+  `/api/orders/[orderId]/provider-status` polling path as marketplace orders;
+  queued and processing media jobs remain incomplete until the provider returns
+  a terminal result, refund state, or completed project URL. Agent-paid x402
+  calls include the agent run ID in gateway order and receipt records so
+  provider dashboards and usage pages count autonomous tool calls in the same
+  revenue ledger as browser and developer API calls. x402 payment requirements
+  use the settlement token's EIP-712 domain metadata in
   `NEXT_PUBLIC_PAYMENT_TOKEN_NAME`, `NEXT_PUBLIC_PAYMENT_TOKEN_SYMBOL`,
   `NEXT_PUBLIC_PAYMENT_TOKEN_LABEL`, `NEXT_PUBLIC_PAYMENT_TOKEN_VERSION`, and
   `NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS`; the configured settlement token address
   comes from `NEXT_PUBLIC_PAYMENT_TOKEN_ADDRESS`, and
-  `NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD` selects the x402 EVM transfer
-  mode used in payment requirements. Use `eip3009` for tokens that support
-  `transferWithAuthorization`; use `permit2` for standard ERC-20 approval and
-  Permit2 signature flows. Signed x402 payloads, Permit2 checks, agent vault
+  `NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD=eip3009` selects the x402 EVM
+  transfer mode used in payment requirements. The default Morph Hoodi USDC
+  configuration uses EIP-3009 signatures and skips Permit2 allowance approval;
+  Permit2 readiness checks run only when the transfer method is explicitly set
+  to `permit2`. Signed x402 payloads, token readiness checks, agent vault
   funding, and escrow reserves must use that token metadata for facilitator
-  verification and settlement. Vault spend and refund writes
-  wait for successful transaction receipts, and refund recovery reads the
-  vault's live spent amount before calling `recordSpendRefund` so retries and
-  partially recovered failures do not request a larger refund than the current
-  vault state can accept. Direct run reads refresh from Convex by run ID before
-  using the in-memory run cache so polling clients see the latest persisted
-  progress across server runtimes. Agent action progress records the settled
-  x402 order/receipt and the provider's initial response as soon as the paid
-  request is accepted, then keeps async media actions in `paid` state while
-  polling for the terminal provider output. The latest async provider-status
-  poll is stored on the action with attempt number, timestamp, polling URL,
-  request method, headers, path parameters, HTTP status, order state,
-  result-release state, external job ID, result URL when present, and compact
-  response metadata; each new backend poll replaces the prior visible snapshot
-  instead of growing an unbounded history. The run page refreshes running,
-  attesting, and active paid async runs every eight seconds, reconciles stale
-  paid actions through the provider-status endpoint using the configured public
-  app origin, auto-resumes remaining planned tools after an async action reaches
-  a terminal state, renders the latest async poll as a compact live-status
-  disclosure without poll-number timeline rows, and keeps compact
-  request/response JSON inside expandable diagnostics. Receipt, settlement, and
-  vault transaction links render as icon actions on each tool card, while public
-  provider result links render as compact host/path previews instead of
-  full-width raw URLs. Agent and marketplace snapshots persisted to Convex keep
-  result URLs, job IDs, statuses, pricing, and escrow metadata, but compact
-  provider response bodies before saving. When `AGENT_LLM_API_KEY` is
-  configured, the agent uses the OpenAI Responses API with `AGENT_LLM_MODEL` or
-  `gpt-5.2` to select tools, generate request payloads, skip unrelated tools,
-  reserve one affordable media tool when the objective or template requires
-  video output, set a budget strategy, and synthesize the final launch pack from
-  completed paid responses and receipts. When no paid action completes in
-  production, the run remains failed and presents diagnostics instead of
-  treating generated copy as verified output. When the key is absent, the
-  deterministic fallback ranks the allowed marketplace tools from the objective
-  and source context while preserving required media-tool selection for video
-  workflows. Both planner modes record the prompt, model or fallback label,
-  rationale, skipped tools, selected tools, funding ledger, and synthesis
-  metadata in run deliverables, action cards, and proof payloads.
+  verification and settlement. Server-submitted vault writes, escrow writes,
+  optional agent-signer Permit2 approvals, and agent-signer settlement-token
+  returns apply an explicit EIP-7623 floor-safe gas limit with a 1.5x buffer
+  before broadcasting to the configured Morph RPC. Retryable pre-broadcast
+  payment RPC failures use exponential backoff, promote any returned EIP-7623
+  floor value to the next retry's minimum gas limit, record each attempt on the
+  action, wait for successful transaction receipts, and avoid retrying after a
+  transaction hash is accepted so vault spends are not duplicated. Agent-paid x402 calls
+  retry retryable pre-response settlement and gateway failures three times with
+  fresh signed payloads; once a paid endpoint returns a provider/order response,
+  the gateway does not submit a second x402 payment for the same vault advance.
+  Escrow reserve, release, and refund writes use a higher floor-safe gas budget
+  than simple vault writes because `ApiPaymentEscrow.reservePayment` performs
+  role checks, storage writes, and token balance reads. They retry retryable RPC
+  failures and full-gas receipt reverts before surfacing escrow handoff
+  diagnostics. Async provider failures with transient HTTP status codes or
+  transient gateway language stay reserved for up to three provider retries
+  before the order becomes terminal and refund recovery begins. Refund recovery
+  reads the vault's live spent amount before calling `recordSpendRefund` so
+  retries and partially recovered failures do not request a larger refund than
+  the current vault state can accept, and it checks the backend agent signer's
+  settlement-token balance before submitting a return transfer so diagnostics
+  distinguish signer USDC shortages from the owner wallet's native gas balance.
+  Direct run reads refresh from Convex by run ID before using the in-memory run
+  cache so polling clients see the latest persisted progress across server
+  runtimes. Agent action progress records the settled x402 order/receipt and the
+  provider's initial response as soon as the paid request is accepted, then
+  keeps async media actions in `paid` state while polling for the terminal
+  provider output. The latest async provider-status poll is stored on the action
+  with attempt number, timestamp, polling URL, request method, headers, path
+  parameters, HTTP status, order state, result-release state, external job ID,
+  result URL when present, and compact response metadata; each new backend poll
+  replaces the prior visible snapshot instead of growing an unbounded history.
+  The run page refreshes running, attesting, and active paid async runs every
+  eight seconds, reconciles stale paid actions through the provider-status
+  endpoint using the configured public app origin, auto-resumes remaining
+  planned tools after an async action reaches a terminal state, renders the
+  latest async poll as a compact live-status disclosure without poll-number
+  timeline rows, summarizes each tool's quote, phase, vault spend, order, and
+  status in collapsed-by-default tool cards, and keeps compact request/response
+  JSON inside expandable diagnostics. Receipt, settlement, and vault transaction
+  links render as icon actions in each tool card header. Payment transaction
+  attempts render in expandable chronological per-action diagnostics with step
+  numbers, per-step retry numbers, gas limit, retry delay, message, and
+  transaction link when available. Funding, skipped tools, planner receipts, and
+  deliverable diagnostics live as collapsed sections at the bottom of the final
+  deliverable card. Long provider, gateway, and contract failure text stays
+  inside expandable copyable diagnostics with user-facing summaries for budget,
+  gas-floor, agent signer settlement-token balance, contract, refund, and tool
+  failures; run-control error banners appear only for failed runs or failed tool
+  actions, so recovered retry errors do not remain visible while tools continue
+  processing. AgentRunVault over-budget errors show funded, spent, available,
+  and attempted tool-spend context before the raw error. Public provider result
+  links render as compact host/path previews instead of full-width raw URLs.
+  Agent and marketplace snapshots persisted to Convex keep result URLs, job IDs,
+  statuses, pricing, and escrow metadata, but compact provider response bodies
+  before saving. When `AGENT_LLM_API_KEY` is configured, the agent uses the
+  OpenAI Responses API with `AGENT_LLM_MODEL` or `gpt-5.2` to select tools,
+  generate request payloads, skip unrelated tools, reserve one affordable media
+  tool when the objective or template requires video output, set a budget
+  strategy, and synthesize the final launch pack from completed paid responses
+  and receipts. When no paid action completes in production, the run remains
+  failed and presents diagnostics instead of treating generated copy as verified
+  output. When the key is absent, the deterministic fallback ranks the allowed
+  marketplace tools from the objective and source context while preserving
+  required media-tool selection for video workflows. Both planner modes record
+  the prompt, model or fallback label, rationale, skipped tools, selected tools,
+  funding ledger, and synthesis metadata in run deliverables, action cards, and
+  proof payloads.
 - `/agents` is a tabbed command center that opens on recent runs and also
   exposes a templates tab. Both tabs use separate server-fed tables with search,
   sorting, and pagination; recent runs support current-page row selection and
@@ -810,11 +855,11 @@ Before creating a new helper or service file:
   pagination, status, amount, and order-opening actions. `/orders/[orderId]`
   shows buyer request lifecycle state using shared order status labels and
   descriptions from `src/features/marketplace/status.ts`; order detail pages
-  sign x402 USDC payments with the connected browser wallet, check and submit
-  the required payment-token Permit2 allowance transaction when needed, verify
-  USDC balance before asking for payment signatures, wait for the approval
-  receipt and readable allowance, retry transient quote, allowance, signature,
-  settlement, claim, and provider status errors with bounded exponential backoff
+  sign x402 USDC payments with the connected browser wallet, verify USDC
+  balance before asking for payment signatures, submit payment-token Permit2
+  allowance only when the configured transfer method requires it, retry
+  transient quote, token-readiness, signature, settlement, claim, and provider
+  status errors with bounded exponential backoff
   while avoiding retries after receipt or payment artifacts are returned,
   display step-by-step wallet progress as a compact icon timeline with explorer
   links for submitted transactions, surface settlement failure guidance from the
@@ -896,8 +941,11 @@ Before creating a new helper or service file:
 - x402 network configuration uses the CAIP-2 identifier in
   `NEXT_PUBLIC_X402_NETWORK`; the resource server in
   `src/lib/x402/payment-resource-server.ts` registers the EVM `exact` scheme,
-  uses `X402_FACILITATOR_URL`, protects product call routes, and resolves
-  dollar-denominated prices to the configured payment token.
+  protects product call routes, and resolves dollar-denominated prices to the
+  configured payment token. When a compatible server settlement key is
+  configured, the resource server uses an in-process facilitator signer with
+  EIP-7623 floor-safe gas and retryable pre-broadcast settlement retries;
+  otherwise it delegates settlement to `X402_FACILITATOR_URL`.
 - Walkthrough and deployment documentation lives in `docs/demo-script.md` and
   `docs/deployment-checklist.md`.
 - The admin subscriptions page reads SubscriptionManager balance, plan prices,
@@ -951,6 +999,14 @@ Before creating a new helper or service file:
   link-based navigation. `NavigationProgressEvents` starts the same loader for
   same-origin form submits and browser-level unload navigations so redirects
   outside `next/link` still show progress.
+- Vercel deployment settings live in `vercel.json` with Next.js framework
+  detection, `pnpm install --frozen-lockfile`, `pnpm build`, and `pnpm dev`. Git
+  deployments are explicitly enabled for Git-connected Vercel projects so
+  repository pushes can create deployments unless the Vercel project dashboard
+  disables deployments for a branch. Vercel environment resets from `.env.local`
+  use `scripts/sync-vercel-env.cjs` through the `vercel:env:sync:*` package
+  scripts; the sync script requires an existing Vercel project link and does not
+  pull remote environment variables into `.env.local`.
 - Theme switching using `next-themes` with class-based dark mode.
 
 ## Core Commands

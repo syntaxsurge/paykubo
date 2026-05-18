@@ -102,7 +102,7 @@ async function handlePaidProductCall(
   rawPayload: unknown
 ) {
   const product = await getProductBySlug(slug)
-  const requestedOrderId = request.headers.get('x-app-order-id')
+  const requestedOrderId = request.headers.get('x-paykubo-order-id')
   const agentRunId = request.headers.get('x-app-agent-run-id') ?? undefined
   const existingOrder = requestedOrderId
     ? await getMarketplaceOrderById(requestedOrderId)
@@ -236,7 +236,21 @@ async function handlePaidProductCall(
       createdAt,
       existingOrder,
       agentRunId
-    })
+    }).catch(caughtError =>
+      NextResponse.json(
+        {
+          error: 'Async paid product call failed.',
+          message: describeUnknownError(caughtError),
+          guidance:
+            'The gateway reached the prepaid async settlement path but could not finish the async provider handoff. The agent will not retry this as a second x402 payment because the first payment may already have settled.',
+          data: {
+            status: 'failed',
+            reason: 'async_prepaid_handoff_failed'
+          }
+        },
+        { status: 502 }
+      )
+    )
   }
 
   const adapterResult = await providerAdapter.call({

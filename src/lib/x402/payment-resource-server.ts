@@ -1,16 +1,31 @@
+import { x402Facilitator } from '@x402/core/facilitator'
 import {
+  HTTPFacilitatorClient,
+  type FacilitatorClient,
   type HTTPRequestContext,
   type RouteConfig,
   x402HTTPResourceServer,
   x402ResourceServer
 } from '@x402/core/server'
 import type { Network } from '@x402/core/types'
-import { registerExactEvmScheme } from '@x402/evm/exact/server'
+import type { FacilitatorEvmSigner } from '@x402/evm'
+import { registerExactEvmScheme as registerExactEvmFacilitatorScheme } from '@x402/evm/exact/facilitator'
+import { registerExactEvmScheme as registerExactEvmResourceScheme } from '@x402/evm/exact/server'
+import {
+  createPublicClient,
+  createWalletClient,
+  encodeFunctionData,
+  http,
+  type Address,
+  type Hex
+} from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
 
 import { getMarketplaceOrderById } from '@/features/marketplace/orders'
 import { resolveProductPrice } from '@/features/marketplace/pricing'
 import { getProductBySlug } from '@/features/marketplace/products'
 import {
+  defaultAppChain,
   defaultX402FacilitatorUrl,
   paymentTokenSymbol,
   toPaymentAssetAmount,
@@ -18,12 +33,18 @@ import {
 } from '@/lib/config/chains'
 import { siteConfig } from '@/lib/config/site'
 import { getApiPaymentPayTo } from '@/lib/contracts/api-payment-escrow'
+import {
+  extractEip7623FloorGasFromError,
+  getBufferedContractWriteGasLimit
+} from '@/lib/contracts/gas'
 import { envServer } from '@/lib/env/env.server'
 import { HmacFacilitatorClient } from '@/lib/x402/hmac-facilitator-client'
 
 const paidCallPattern = '/api/x402/products/:slug/call'
 const claimPattern = '/api/x402/orders/:orderId/claim'
 const x402MaxTimeoutSeconds = 60
+const facilitatorTransactionMaxAttempts = 3
+const facilitatorTransactionBaseRetryDelayMs = 750
 let serverPromise: Promise<x402HTTPResourceServer> | null = null
 
 function getProductSlugFromPath(path: string) {
@@ -61,7 +82,7 @@ async function canPriceProductFromContext(
     return false
   }
 
-  const orderId = context.adapter.getHeader?.('x-app-order-id')
+  const orderId = context.adapter.getHeader?.('x-paykubo-order-id')
   const order = orderId ? await getMarketplaceOrderById(orderId) : undefined
 
   if (!order || order.productSlug !== product.slug) {
@@ -96,7 +117,8 @@ const paidCallRoute: RouteConfig = {
     },
     maxTimeoutSeconds: x402MaxTimeoutSeconds
   },
-  description: 'Payment-token-settled API call through the x402 protocol.',
+  description:
+    'USDC-settled Paykubo API call on Morph through the x402 protocol.',
   mimeType: 'application/json',
   unpaidResponseBody: async context => {
     const product = await requireProductFromContext(context)
@@ -128,8 +150,7 @@ const paidCallRoute: RouteConfig = {
         payment: {
           network: x402Network,
           scheme: 'exact',
-          facilitatorUrl:
-            envServer.X402_FACILITATOR_URL ?? defaultX402FacilitatorUrl
+          facilitator: getPaymentFacilitatorLabel()
         }
       }
     }
@@ -189,8 +210,7 @@ const claimRoute: RouteConfig = {
         payment: {
           network: x402Network,
           scheme: 'exact',
-          facilitatorUrl:
-            envServer.X402_FACILITATOR_URL ?? defaultX402FacilitatorUrl
+          facilitator: getPaymentFacilitatorLabel()
         }
       }
     }
@@ -227,14 +247,10 @@ function getRequestPayload(context: HTTPRequestContext) {
 export async function getPaymentX402Server() {
   if (!serverPromise) {
     serverPromise = (async () => {
-      const facilitator = new HmacFacilitatorClient({
-        url: envServer.X402_FACILITATOR_URL ?? defaultX402FacilitatorUrl,
-        accessKey: envServer.X402_FACILITATOR_ACCESS_KEY,
-        secretKey: envServer.X402_FACILITATOR_SECRET_KEY
-      })
+      const facilitator = createPaymentFacilitator()
       const resourceServer = new x402ResourceServer(facilitator)
 
-      registerExactEvmScheme(resourceServer, {
+      registerExactEvmResourceScheme(resourceServer, {
         networks: [x402Network as Network]
       })
 
@@ -251,6 +267,234 @@ export async function getPaymentX402Server() {
   }
 
   return serverPromise
+}
+
+function createPaymentFacilitator(): FacilitatorClient {
+  if (
+    envServer.X402_FACILITATOR_ACCESS_KEY &&
+    envServer.X402_FACILITATOR_SECRET_KEY
+  ) {
+    return createRemoteFacilitatorClient()
+  }
+
+  const privateKey = getLocalFacilitatorPrivateKey()
+
+  if (!privateKey) {
+    return createRemoteFacilitatorClient()
+  }
+
+  const facilitator = new x402Facilitator()
+
+  registerExactEvmFacilitatorScheme(facilitator, {
+    networks: [x402Network as Network],
+    signer: buildLocalFacilitatorSigner(privateKey)
+  })
+
+  return {
+    getSupported: () =>
+      Promise.resolve(
+        facilitator.getSupported() as unknown as Awaited<
+          ReturnType<FacilitatorClient['getSupported']>
+        >
+      ),
+    verify: (paymentPayload, paymentRequirements) =>
+      facilitator.verify(paymentPayload, paymentRequirements),
+    settle: (paymentPayload, paymentRequirements) =>
+      facilitator.settle(paymentPayload, paymentRequirements)
+  }
+}
+
+function createRemoteFacilitatorClient(): FacilitatorClient {
+  const url = envServer.X402_FACILITATOR_URL ?? defaultX402FacilitatorUrl
+
+  if (
+    envServer.X402_FACILITATOR_ACCESS_KEY ||
+    envServer.X402_FACILITATOR_SECRET_KEY
+  ) {
+    return new HmacFacilitatorClient({
+      url,
+      accessKey: envServer.X402_FACILITATOR_ACCESS_KEY,
+      secretKey: envServer.X402_FACILITATOR_SECRET_KEY
+    })
+  }
+
+  return new HTTPFacilitatorClient({ url })
+}
+
+function getLocalFacilitatorPrivateKey() {
+  const privateKey =
+    envServer.AGENT_SPENDER_PRIVATE_KEY ??
+    envServer.API_ESCROW_OPERATOR_PRIVATE_KEY ??
+    envServer.AGENT_RUN_VAULT_OPERATOR_PRIVATE_KEY
+
+  if (!privateKey) {
+    return null
+  }
+
+  return privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`
+}
+
+function getPaymentFacilitatorLabel() {
+  if (
+    envServer.X402_FACILITATOR_ACCESS_KEY &&
+    envServer.X402_FACILITATOR_SECRET_KEY
+  ) {
+    return envServer.X402_FACILITATOR_URL ?? defaultX402FacilitatorUrl
+  }
+
+  return getLocalFacilitatorPrivateKey()
+    ? 'local floor-safe facilitator'
+    : (envServer.X402_FACILITATOR_URL ?? defaultX402FacilitatorUrl)
+}
+
+function buildLocalFacilitatorSigner(privateKey: string): FacilitatorEvmSigner {
+  const account = privateKeyToAccount(privateKey as Hex)
+  const publicClient = createPublicClient({
+    chain: defaultAppChain.viemChain,
+    transport: http(defaultAppChain.viemChain.rpcUrls.default.http[0])
+  })
+  const walletClient = createWalletClient({
+    account,
+    chain: defaultAppChain.viemChain,
+    transport: http(defaultAppChain.viemChain.rpcUrls.default.http[0])
+  })
+
+  async function sendFloorSafeTransaction({
+    to,
+    data,
+    estimatedGas
+  }: {
+    to: Address
+    data: Hex
+    estimatedGas?: bigint
+  }) {
+    let retryMinimumGas: bigint | undefined
+
+    for (
+      let attempt = 1;
+      attempt <= facilitatorTransactionMaxAttempts;
+      attempt += 1
+    ) {
+      let txHash: Hex | null = null
+      const gas = getBufferedContractWriteGasLimit({
+        data,
+        estimatedGas,
+        minimumGas: retryMinimumGas
+      })
+
+      try {
+        txHash = await walletClient.sendTransaction({
+          account,
+          chain: defaultAppChain.viemChain,
+          to,
+          data,
+          gas
+        })
+
+        return txHash
+      } catch (error) {
+        const message = describeFacilitatorTransactionError(error)
+        retryMinimumGas =
+          extractEip7623FloorGasFromError(error) ?? retryMinimumGas
+        const shouldRetry =
+          !txHash &&
+          attempt < facilitatorTransactionMaxAttempts &&
+          isRetryableFacilitatorTransactionError(message)
+
+        if (!shouldRetry) {
+          throw new Error(message)
+        }
+
+        await wait(getFacilitatorRetryDelayMs(attempt))
+      }
+    }
+
+    throw new Error(
+      `x402 facilitator transaction failed after ${facilitatorTransactionMaxAttempts} attempts.`
+    )
+  }
+
+  return {
+    getAddresses: () => [account.address],
+    readContract: args => publicClient.readContract(args),
+    verifyTypedData: args =>
+      publicClient.verifyTypedData(
+        args as Parameters<typeof publicClient.verifyTypedData>[0]
+      ),
+    writeContract: async args => {
+      const data = encodeFunctionData({
+        abi: args.abi,
+        functionName: args.functionName,
+        args: args.args
+      })
+
+      return sendFloorSafeTransaction({
+        to: args.address,
+        data,
+        estimatedGas: args.gas
+      })
+    },
+    sendTransaction: args =>
+      sendFloorSafeTransaction({
+        to: args.to,
+        data: args.data
+      }),
+    waitForTransactionReceipt: args =>
+      publicClient.waitForTransactionReceipt(args),
+    getCode: args => publicClient.getCode(args)
+  }
+}
+
+function isRetryableFacilitatorTransactionError(message: string) {
+  const lower = message.toLowerCase()
+
+  if (
+    lower.includes('insufficient balance') ||
+    lower.includes('allowance_required') ||
+    lower.includes('invalid signature') ||
+    lower.includes('signatureexpired') ||
+    lower.includes('invalid nonce') ||
+    lower.includes('already used') ||
+    lower.includes('reverted')
+  ) {
+    return false
+  }
+
+  return (
+    lower.includes('gas limit below eip-7623 floor') ||
+    lower.includes('failed to verify the fees') ||
+    lower.includes('missing or invalid parameters') ||
+    lower.includes('invalid_exact_evm_transaction_failed') ||
+    lower.includes('out of gas') ||
+    lower.includes('timeout') ||
+    lower.includes('timed out') ||
+    lower.includes('network') ||
+    lower.includes('connection') ||
+    lower.includes('temporar') ||
+    lower.includes('rate limit') ||
+    lower.includes('429') ||
+    lower.includes('503') ||
+    lower.includes('nonce too low') ||
+    lower.includes('underpriced')
+  )
+}
+
+function getFacilitatorRetryDelayMs(attempt: number) {
+  return facilitatorTransactionBaseRetryDelayMs * 2 ** (attempt - 1)
+}
+
+function describeFacilitatorTransactionError(error: unknown) {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  return typeof error === 'string'
+    ? error
+    : 'x402 facilitator transaction failed.'
+}
+
+function wait(delayMs: number) {
+  return new Promise<void>(resolve => setTimeout(resolve, delayMs))
 }
 
 function parseUsdcAmount(value: string | undefined) {

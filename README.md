@@ -59,11 +59,17 @@ pnpm dev
 ```bash
 pnpm convex:dev
 pnpm convex:deploy
+pnpm seed:database
+pnpm seed:admin-tools
 ```
+
+`seed:database` upserts wallet-scoped users with associated provider profiles.
+`seed:admin-tools` upserts the public provider-owned marketplace tools. Both
+commands use the configured `NEXT_PUBLIC_CONVEX_URL`.
 
 ## EVM Chain
 
-Paykubo defaults to Morph Hoodi for USDC-paid API commerce. To migrate to
+Paykubo defaults to Morph Hoodi Testnet for USDC-paid API commerce. To migrate to
 another EVM network, update the `NEXT_PUBLIC_EVM_*`,
 `NEXT_PUBLIC_PAYMENT_TOKEN_*`, `NEXT_PUBLIC_X402_NETWORK`, and
 `X402_FACILITATOR_*` values, then redeploy the contracts on that target chain.
@@ -102,7 +108,7 @@ The command uses `@x402/fetch` to sign the payment, retry the request, and print
 the settled response.
 
 Humans can also open a marketplace product, create a payable request, and click
-`Run with wallet` to approve USDC Permit2 allowance when needed, sign the x402
+`Run with wallet` to check USDC readiness, sign the x402
 payment from the connected browser wallet, and receive the provider response.
 Teams that want API-key ergonomics can use `/billing` to create a managed credit
 account and call `/api/credits/products/{slug}/call` with a Paykubo API key.
@@ -119,6 +125,49 @@ async polling, and result-path fields before publishing a paid listing.
 - API reference: `/api/reference`
 - OpenAPI JSON: `/api/openapi.json`
 - Operations health: `/api/health`
+
+Deploy manually with the Vercel CLI:
+
+```bash
+pnpm add -D vercel@latest
+pnpm exec vercel login
+pnpm exec vercel --prod
+```
+
+Run `pnpm exec vercel login` only when the CLI is not authenticated. The current
+Vercel CLI login flow uses browser-based OAuth device authorization; do not pass
+an email address or deprecated provider flags to the login command. If using the
+global `vercel` command directly, update it with `npm i -g vercel@latest`.
+
+Manage Vercel project environment variables with the CLI:
+
+```bash
+pnpm exec vercel env ls
+pnpm exec vercel env add NEXT_PUBLIC_CONVEX_URL production --force
+pnpm exec vercel env add AGENT_LLM_API_KEY production --force
+pnpm exec vercel env pull .env.local
+pnpm exec vercel --prod
+```
+
+Use `vercel env add <name> production --force` to create or update a production
+variable. Redeploy with `pnpm exec vercel --prod` after environment changes so
+the new values are available to the build and runtime.
+
+To replace Vercel production environment variables with the values currently in
+`.env.local`, upsert the local keys with `vercel env add --force`, then
+redeploy:
+
+```bash
+pnpm vercel:env:sync:production
+```
+
+Use `pnpm vercel:env:sync:preview` or `pnpm vercel:env:sync:development` to
+reset those Vercel environments without a production redeploy. The sync script
+requires an existing Vercel project link and never pulls Vercel env values into
+`.env.local`. If the project is not linked yet, run `pnpm exec vercel link`
+first and do not pull environment variables when prompted. The sync script
+creates or replaces keys present in `.env.local`; remove extra Vercel-only keys
+manually with `pnpm exec vercel env rm <KEY> production --yes`.
 
 ## Environment
 
@@ -141,8 +190,6 @@ Key values:
 - `NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS`
 - `NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD=eip3009`
 - `X402_FACILITATOR_URL=https://morph-rails-hoodi.morph.network/x402/v2`
-- `X402_FACILITATOR_ACCESS_KEY`
-- `X402_FACILITATOR_SECRET_KEY`
 - `AGENT_SPENDER_PRIVATE_KEY`
 - `AGENT_ATTESTER_PRIVATE_KEY`
 - `AGENT_LLM_API_KEY`
@@ -160,13 +207,11 @@ Key values:
    `AGENT_LLM_MODEL`; otherwise the run is labeled as deterministic fallback.
 6. For x402 settlement, fund the agent run vault from the browser wallet and set
    `NEXT_PUBLIC_APP_URL` to the deployed app URL. The agent spender signs
-   payments and only needs native gas for Permit2 or refund-return transactions.
-   Use `NEXT_PUBLIC_PAYMENT_TOKEN_SYMBOL` and
-   `NEXT_PUBLIC_PAYMENT_TOKEN_LABEL` to change UI copy for USDC, USDT, MUSD,
-   TestBGB, or another settlement token. Use
-   `NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD=eip3009` for tokens with
-   `transferWithAuthorization`; use `permit2` for standard ERC-20 approval
-   flows.
+   payments and only needs native gas for settlement-token return transactions.
+   Use `NEXT_PUBLIC_PAYMENT_TOKEN_SYMBOL` and `NEXT_PUBLIC_PAYMENT_TOKEN_LABEL`
+   to change UI copy for USDC or another settlement token. Paykubo's Morph
+   configuration uses `NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD=eip3009` for
+   EIP-3009 transfer-with-authorization flows.
 
 ## Core Commands
 

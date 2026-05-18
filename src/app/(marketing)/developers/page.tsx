@@ -71,7 +71,7 @@ export default function DevelopersPage() {
           {[
             ['Network', x402Network],
             ['Stablecoin', 'USDC'],
-            ['Gas currency', 'ETH'],
+            ['Gas currency', 'BTC'],
             ['Facilitator', 'https://morph-rails-hoodi.morph.network/x402/v2']
           ].map(([label, value]) => (
             <div key={label}>

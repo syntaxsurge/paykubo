@@ -19,12 +19,37 @@ import {
   paymentTokenDecimals,
   paymentTokenAddress
 } from '@/lib/config/chains'
+import {
+  extractEip7623FloorGasFromError,
+  getBufferedContractWriteGasLimit
+} from '@/lib/contracts/gas'
 import { envClient } from '@/lib/env/env.client'
 import { envServer } from '@/lib/env/env.server'
 
 export type AgentVaultWriteResult = {
   txHash: Hex
   explorerUrl: string | null
+  attempts: AgentVaultWriteAttempt[]
+}
+
+export type AgentRunVaultFunctionName =
+  | 'markRunning'
+  | 'recordSpend'
+  | 'recordSpendRefund'
+  | 'markCompleted'
+  | 'cancelRun'
+  | 'refundUnused'
+
+export type AgentVaultWriteAttempt = {
+  attempt: number
+  functionName: AgentRunVaultFunctionName
+  status: 'failed' | 'succeeded'
+  message: string
+  gasLimit?: string
+  txHash?: Hex | null
+  explorerUrl?: string | null
+  retryDelayMs?: number
+  createdAt: string
 }
 
 export type AgentRunVaultBudget = {
@@ -177,6 +202,8 @@ const publicClient = createPublicClient({
   chain: defaultAppChain.viemChain,
   transport: http(defaultAppChain.viemChain.rpcUrls.default.http[0])
 })
+const agentRunVaultWriteMaxAttempts = 3
+const agentRunVaultWriteBaseRetryDelayMs = 750
 
 export function getAgentRunVaultAddress() {
   const address = envClient.NEXT_PUBLIC_AGENT_RUN_VAULT_ADDRESS
@@ -270,13 +297,7 @@ export async function writeAgentRunVault({
   functionName,
   args
 }: {
-  functionName:
-    | 'markRunning'
-    | 'recordSpend'
-    | 'recordSpendRefund'
-    | 'markCompleted'
-    | 'cancelRun'
-    | 'refundUnused'
+  functionName: AgentRunVaultFunctionName
   args: readonly [Hex] | readonly [Hex, Hex, bigint]
 }): Promise<AgentVaultWriteResult | null> {
   const address = getAgentRunVaultAddress()
@@ -292,24 +313,159 @@ export async function writeAgentRunVault({
     chain: defaultAppChain.viemChain,
     transport: http(defaultAppChain.viemChain.rpcUrls.default.http[0])
   })
-  const { request } = await publicClient.simulateContract({
-    address,
-    abi: agentRunVaultAbi,
-    functionName,
-    args,
-    account
-  })
-  const txHash = await walletClient.writeContract(request)
-  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+  const attempts: AgentVaultWriteAttempt[] = []
+  let retryMinimumGas: bigint | undefined
 
-  if (receipt.status !== 'success') {
-    throw new Error(`AgentRunVault ${functionName} transaction reverted.`)
+  for (
+    let attempt = 1;
+    attempt <= agentRunVaultWriteMaxAttempts;
+    attempt += 1
+  ) {
+    let txHash: Hex | null = null
+    let gasLimit: bigint | undefined
+
+    try {
+      const { request } = await publicClient.simulateContract({
+        address,
+        abi: agentRunVaultAbi,
+        functionName,
+        args,
+        account
+      })
+      const gasRequest = request as typeof request & {
+        data?: Hex
+        gas?: bigint
+      }
+      gasLimit = getBufferedContractWriteGasLimit({
+        data: gasRequest.data,
+        estimatedGas: gasRequest.gas,
+        minimumGas: retryMinimumGas
+      })
+      txHash = await walletClient.writeContract({
+        ...request,
+        gas: gasLimit
+      })
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash
+      })
+
+      if (receipt.status !== 'success') {
+        throw new Error(`AgentRunVault ${functionName} transaction reverted.`)
+      }
+
+      const explorerUrl = buildExplorerUrl(txHash)
+
+      attempts.push({
+        attempt,
+        functionName,
+        status: 'succeeded',
+        message: `AgentRunVault ${functionName} transaction confirmed.`,
+        gasLimit: gasLimit.toString(),
+        txHash,
+        explorerUrl,
+        createdAt: new Date().toISOString()
+      })
+
+      return {
+        txHash,
+        explorerUrl,
+        attempts
+      }
+    } catch (error) {
+      const message = describeContractWriteError(error)
+      retryMinimumGas =
+        extractEip7623FloorGasFromError(error) ?? retryMinimumGas
+      const shouldRetry =
+        !txHash &&
+        attempt < agentRunVaultWriteMaxAttempts &&
+        isRetryableAgentRunVaultWriteError(message)
+      const retryDelayMs = shouldRetry
+        ? getExponentialRetryDelayMs(attempt)
+        : undefined
+
+      attempts.push({
+        attempt,
+        functionName,
+        status: 'failed',
+        message,
+        gasLimit: gasLimit?.toString(),
+        txHash,
+        retryDelayMs,
+        createdAt: new Date().toISOString()
+      })
+
+      if (!shouldRetry) {
+        throw new AgentRunVaultWriteError(message, attempts)
+      }
+
+      await wait(retryDelayMs)
+    }
   }
 
-  return {
-    txHash,
-    explorerUrl: buildExplorerUrl(txHash)
+  throw new AgentRunVaultWriteError(
+    `AgentRunVault ${functionName} transaction failed after ${agentRunVaultWriteMaxAttempts} attempts.`,
+    attempts
+  )
+}
+
+export class AgentRunVaultWriteError extends Error {
+  attempts: AgentVaultWriteAttempt[]
+
+  constructor(message: string, attempts: AgentVaultWriteAttempt[]) {
+    super(message)
+    this.name = 'AgentRunVaultWriteError'
+    this.attempts = attempts
   }
+}
+
+export function getAgentRunVaultWriteAttempts(error: unknown) {
+  return error instanceof AgentRunVaultWriteError ? error.attempts : []
+}
+
+function isRetryableAgentRunVaultWriteError(message: string) {
+  const lower = message.toLowerCase()
+
+  if (
+    lower.includes('agentrunvault: over budget') ||
+    lower.includes('reverted') ||
+    lower.includes('not authorized') ||
+    lower.includes('invalid amount') ||
+    lower.includes('invalid payment')
+  ) {
+    return false
+  }
+
+  return (
+    lower.includes('gas limit below eip-7623 floor') ||
+    lower.includes('failed to verify the fees') ||
+    lower.includes('missing or invalid parameters') ||
+    lower.includes('timeout') ||
+    lower.includes('timed out') ||
+    lower.includes('network') ||
+    lower.includes('connection') ||
+    lower.includes('temporar') ||
+    lower.includes('rate limit') ||
+    lower.includes('429') ||
+    lower.includes('503') ||
+    lower.includes('nonce too low') ||
+    lower.includes('underpriced')
+  )
+}
+
+function getExponentialRetryDelayMs(attempt: number) {
+  return agentRunVaultWriteBaseRetryDelayMs * 2 ** (attempt - 1)
+}
+
+function describeContractWriteError(error: unknown) {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  return typeof error === 'string' ? error : 'AgentRunVault write failed.'
+}
+
+function wait(delayMs = 0) {
+  return new Promise<void>(resolve => setTimeout(resolve, delayMs))
 }
 
 function normalizeAgentRunVaultBudget(value: unknown): AgentRunVaultBudget {

@@ -21,8 +21,6 @@ Use this checklist before operating the app.
 - `NEXT_PUBLIC_EVM_IS_TESTNET=true`
 - `NEXT_PUBLIC_X402_NETWORK=eip155:2910`
 - `X402_FACILITATOR_URL=https://morph-rails-hoodi.morph.network/x402/v2`
-- `X402_FACILITATOR_ACCESS_KEY` for x402 `/verify` and `/settle` HMAC auth
-- `X402_FACILITATOR_SECRET_KEY` for x402 `/verify` and `/settle` HMAC signing
 - `AGENT_SPENDER_PRIVATE_KEY`
 - `AGENT_ATTESTER_PRIVATE_KEY`
 - `NEXT_PUBLIC_AGENT_ATTESTOR_ADDRESS`
@@ -30,8 +28,11 @@ Use this checklist before operating the app.
 - `AGENT_RUN_VAULT_OPERATOR_PRIVATE_KEY`
 - `NEXT_PUBLIC_PAYMENT_TOKEN_ADDRESS`
 - `NEXT_PUBLIC_PAYMENT_TOKEN_NAME`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_SYMBOL=USDC`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_LABEL=USDC`
 - `NEXT_PUBLIC_PAYMENT_TOKEN_VERSION`
 - `NEXT_PUBLIC_PAYMENT_TOKEN_DECIMALS`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_TRANSFER_METHOD=eip3009`
 
 ## Current Contract Addresses
 
@@ -53,6 +54,8 @@ pnpm build
 - `GET /api/health` returns readiness checks.
 - `GET /api/openapi.json` returns the OpenAPI document.
 - `GET /api/reference` renders the Scalar reference.
+- `pnpm seed:database` upserts wallet-scoped users and their provider profiles.
+- `pnpm seed:admin-tools` upserts public provider-owned marketplace tools.
 - `POST /api/agents/runs` creates a Launch Pack Agent run.
 - `POST /api/agents/runs/[runId]/execute` uses OpenAI planning and synthesis
   when `AGENT_LLM_API_KEY` is configured, clearly labels deterministic fallback

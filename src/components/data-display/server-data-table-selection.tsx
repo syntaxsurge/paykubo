@@ -2,18 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { Loader2, Trash2 } from 'lucide-react'
+import { AlertTriangle, Loader2, Trash2 } from 'lucide-react'
 import { useRouter } from 'nextjs-toploader/app'
 
 import { notifyServerTableSelectionUpdated } from '@/components/data-display/server-data-table-master-checkbox'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils/cn'
 
 export type ServerDataTableBulkAction = {
   label: string
   endpoint: string
   method?: 'POST' | 'DELETE'
   confirmMessage?: string
+  tone?: 'default' | 'destructive'
 }
 
 export function ServerDataTableSelection({
@@ -171,42 +173,63 @@ export function ServerDataTableSelection({
     }
   }
 
+  const selectedCount = effectiveSelectedIds.length
+  const hasSelection = selectedCount > 0
+
   return (
-    <div className='border-border bg-card/90 flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between'>
-      <label className='flex items-center gap-3 text-sm font-semibold'>
-        <input
-          ref={masterCheckboxRef}
-          type='checkbox'
-          className='border-border text-primary focus:ring-ring h-4 w-4 rounded'
-          aria-label='Select all rows on this page'
-          onChange={event => toggleCurrentPage(event.currentTarget.checked)}
-        />
-        <span>
-          {effectiveSelectedIds.length} {selectedLabel}
-        </span>
-      </label>
-      {bulkActions.length > 0 ? (
-        <div className='flex flex-wrap gap-2'>
-          {bulkActions.map(action => (
-            <Button
-              key={action.label}
-              type='button'
-              variant='outline'
-              size='sm'
-              disabled={selectedSet.size === 0}
-              onClick={() => {
-                setActionError('')
-                setPendingAction(action)
-              }}
-            >
-              <Trash2 className='h-4 w-4' aria-hidden />
-              {action.label}
-            </Button>
-          ))}
-        </div>
-      ) : null}
+    <div
+      className={cn(
+        'border-border bg-background/55 rounded-lg border p-3 transition',
+        hasSelection && 'border-primary/40 bg-primary/5 shadow-sm'
+      )}
+    >
+      <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+        <label className='flex min-w-0 items-center gap-3 text-sm font-semibold'>
+          <input
+            ref={masterCheckboxRef}
+            type='checkbox'
+            className='border-border text-primary focus:ring-ring h-4 w-4 shrink-0 rounded'
+            aria-label='Select all rows on this page'
+            onChange={event => toggleCurrentPage(event.currentTarget.checked)}
+          />
+          <span className='min-w-0'>
+            <span className='block'>{selectedCount} selected</span>
+            <span className='text-muted-foreground block text-xs font-medium'>
+              {selectedLabel}
+            </span>
+          </span>
+        </label>
+        {bulkActions.length > 0 ? (
+          <div className='flex flex-wrap gap-2'>
+            {bulkActions.map(action => {
+              const destructive = isDestructiveBulkAction(action)
+
+              return (
+                <Button
+                  key={action.label}
+                  type='button'
+                  variant={destructive ? 'primary' : 'outline'}
+                  size='sm'
+                  disabled={selectedSet.size === 0}
+                  className={cn(
+                    destructive &&
+                      'disabled:bg-muted disabled:text-muted-foreground disabled:hover:bg-muted bg-red-600 text-white shadow-red-950/20 hover:bg-red-700 hover:shadow-red-950/25'
+                  )}
+                  onClick={() => {
+                    setActionError('')
+                    setPendingAction(action)
+                  }}
+                >
+                  <Trash2 className='h-4 w-4' aria-hidden />
+                  {action.label}
+                </Button>
+              )
+            })}
+          </div>
+        ) : null}
+      </div>
       <span className='sr-only' aria-live='polite'>
-        {effectiveSelectedIds.length} rows selected
+        {selectedCount} rows selected
       </span>
       <Dialog
         open={Boolean(pendingAction)}
@@ -217,18 +240,38 @@ export function ServerDataTableSelection({
           }
         }}
         title={pendingAction?.label ?? 'Confirm bulk action'}
-        description={`${effectiveSelectedIds.length} ${
-          effectiveSelectedIds.length === 1 ? 'row is' : 'rows are'
+        description={`${selectedCount} ${
+          selectedCount === 1 ? 'row is' : 'rows are'
         } selected.`}
         className='max-w-xl'
       >
         <div className='space-y-5'>
-          <div className='border-border bg-muted/30 rounded-lg border p-4'>
-            <p className='font-semibold'>Confirm this action</p>
-            <p className='text-muted-foreground mt-2 text-sm leading-6'>
-              {pendingAction?.confirmMessage ??
-                'This action will run for the selected rows.'}
-            </p>
+          <div
+            className={cn(
+              'rounded-lg border p-4',
+              pendingAction && isDestructiveBulkAction(pendingAction)
+                ? 'border-red-500/35 bg-red-500/10'
+                : 'border-border bg-muted/30'
+            )}
+          >
+            <div className='flex items-start gap-3'>
+              {pendingAction && isDestructiveBulkAction(pendingAction) ? (
+                <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/15 text-red-600 dark:text-red-300'>
+                  <AlertTriangle className='h-4 w-4' aria-hidden />
+                </span>
+              ) : null}
+              <div className='min-w-0'>
+                <p className='font-semibold'>
+                  {pendingAction && isDestructiveBulkAction(pendingAction)
+                    ? 'Confirm destructive action'
+                    : 'Confirm this action'}
+                </p>
+                <p className='text-muted-foreground mt-2 text-sm leading-6'>
+                  {pendingAction?.confirmMessage ??
+                    'This action will run for the selected rows.'}
+                </p>
+              </div>
+            </div>
           </div>
 
           {actionError ? (
@@ -255,7 +298,11 @@ export function ServerDataTableSelection({
             <Button
               type='button'
               disabled={!pendingAction || isRunningAction}
-              className='bg-red-600 text-white hover:bg-red-700'
+              className={cn(
+                pendingAction && isDestructiveBulkAction(pendingAction)
+                  ? 'bg-red-600 text-white shadow-red-950/20 hover:bg-red-700'
+                  : ''
+              )}
               onClick={() => {
                 if (pendingAction) {
                   void runBulkAction(pendingAction)
@@ -273,6 +320,16 @@ export function ServerDataTableSelection({
         </div>
       </Dialog>
     </div>
+  )
+}
+
+function isDestructiveBulkAction(action: ServerDataTableBulkAction) {
+  if (action.tone) {
+    return action.tone === 'destructive'
+  }
+
+  return /delete|remove|destroy|bulk-delete/i.test(
+    `${action.label} ${action.endpoint}`
   )
 }
 
