@@ -528,11 +528,11 @@ Before creating a new helper or service file:
   on-chain proof hashes and `contracts/ApiPaymentEscrow.sol` for prepaid
   credit-metered API payments plus `contracts/AgentRunVault.sol` for user-funded
   autonomous agent budgets. Current contract addresses are
-  `NEXT_PUBLIC_SUBSCRIPTION_MANAGER_ADDRESS=0x9a667b845034dDf18B7a5a9b50e2fe8CD4e6e2C1`,
-  `NEXT_PUBLIC_AGENT_ATTESTOR_ADDRESS=0x761D0dbB45654513AdF1BF6b5D217C0f8B3c5737`,
-  `NEXT_PUBLIC_API_PAYMENT_ESCROW_ADDRESS=0x27E9062ee91A0D60De39984346cAeD53bE68024c`,
+  `NEXT_PUBLIC_SUBSCRIPTION_MANAGER_ADDRESS=0x07870EbBE687D98F5636b66c26e4005A854B8921`,
+  `NEXT_PUBLIC_AGENT_ATTESTOR_ADDRESS=0xB031aCC58b182e34262FC7903d05e62AD30a48C8`,
+  `NEXT_PUBLIC_API_PAYMENT_ESCROW_ADDRESS=0x8D875d4596f3BaA32552A5bf094f60446C864970`,
   and
-  `NEXT_PUBLIC_AGENT_RUN_VAULT_ADDRESS=0x158E396020b4A86f351D766fC7748C862c493b6B`.
+  `NEXT_PUBLIC_AGENT_RUN_VAULT_ADDRESS=0xDcC0FB6e9061e25BCd1042227777F37d124b670f`.
 - Shared UI primitives in `src/components/ui` and layout shells in
   `src/components/layout`.
 - Shared JSON rendering lives in `src/components/data-display/json-viewer.tsx`
