@@ -1,6 +1,6 @@
 # Paykubo
 
-[![Paykubo demo](public/images/homepage.png)](https://youtu.be/ucTiJrKCOwg)
+[![Paykubo demo](public/images/homepage.png)](https://youtu.be/9L9X6eV1K_E)
 
 USDC-native API commerce for humans, applications, and AI agents on configurable
 EVM rails.

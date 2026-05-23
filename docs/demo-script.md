@@ -3,7 +3,7 @@
 Project: Paykubo  
 Track: x402 Agentic Payments  
 Demo URL: https://paykubo.vercel.app/  
-Video Link: https://youtu.be/ucTiJrKCOwg
+Video Link: https://youtu.be/9L9X6eV1K_E
 
 One-liner: Paykubo lets API owners sell paid tools, buyers pay with USDC
 through x402, and autonomous agents buy those tools from a funded budget on
