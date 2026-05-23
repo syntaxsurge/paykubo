@@ -374,6 +374,8 @@ Before creating a new helper or service file:
 ## Pages
 
 - `/` (marketing home)
+- `/demo-video`, `/pitch-deck` (temporary marketing redirects configured by
+  `DEMO_VIDEO_URL` and `PITCH_DECK_URL`)
 - `/pricing` (settlement-token API marketplace pricing and fee split)
 - `/developers`, `/developers/docs` (developer onboarding and gateway docs)
 - `/privacy`, `/terms`
